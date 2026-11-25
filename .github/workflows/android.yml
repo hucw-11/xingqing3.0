@@ -28,9 +28,18 @@ jobs:
           path: .signing/development.keystore
           key: student-schedule-explicit-signing-v2
       - name: Prepare fixed development signing key
+        env:
+          RESTORE_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
           mkdir -p .signing
+          if [ -n "$RESTORE_KEYSTORE" ]; then
+            printf '%s' "$RESTORE_KEYSTORE" | base64 -d > .signing/development.keystore
+          fi
           if [ ! -f .signing/development.keystore ]; then
+            if [ -f scripts/signing-certificate.txt ]; then
+              echo 'Signing cache missing. Restore the backed-up keystore with ANDROID_KEYSTORE_BASE64; refusing to replace the installed app identity.'
+              exit 1
+            fi
             keytool -genkeypair -keystore .signing/development.keystore -storepass android -keypass android -alias androiddebugkey -dname 'CN=Android Debug,O=Android,C=US' -keyalg RSA -keysize 2048 -validity 10000
           fi
       - name: Save signing key before device cleanup
@@ -41,6 +50,14 @@ jobs:
           key: student-schedule-explicit-signing-v2
       - name: Tests, lint and APK
         run: gradle --no-daemon testDebugUnitTest lintDebug assembleDebug signingReport
+      - name: Encrypt signing backup for the local owner
+        run: bash scripts/backup-signing.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: encrypted-signing-backup
+          path: .signing-backup/*.enc
+          include-hidden-files: true
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         with:
           name: student-schedule-apk
