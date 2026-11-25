@@ -21,6 +21,11 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Preserve development signing key between builds
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: student-schedule-development-signing-v1
       - name: Tests, lint and APK
         run: gradle --no-daemon testDebugUnitTest lintDebug assembleDebug
       - uses: actions/upload-artifact@v4
@@ -28,6 +33,25 @@ jobs:
           name: student-schedule-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+      - name: Enable KVM for cloud emulator
+        run: sudo chmod 666 /dev/kvm
+      - name: Android device flow and screenshots
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            gradle --no-daemon connectedDebugAndroidTest
+            mkdir -p screenshots
+            adb pull /sdcard/Android/data/cn.campus.schedule/files/. screenshots/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: app-screenshots
+          path: screenshots/
+          if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         if: always()
         with:
