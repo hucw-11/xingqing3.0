@@ -80,6 +80,13 @@ public class MainActivity extends Activity {
         }root.addView(strip);space(root,12);
     }
     private static class Entry {JSONObject source;boolean course;String title,note,time;int minute;boolean allDay,done;}
+    private class TimelineRail extends LinearLayout {
+        private final android.graphics.Paint paint=new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        TimelineRail(){super(MainActivity.this);setOrientation(VERTICAL);setWillNotDraw(false);}
+        @Override protected void onDraw(android.graphics.Canvas canvas){
+            super.onDraw(canvas);paint.setColor(0xffd8dce5);paint.setStrokeWidth(dp(1.5f));canvas.drawLine(dp(58),dp(5),dp(58),getHeight()-dp(4),paint);paint.setColor(BLUE);canvas.drawCircle(dp(58),dp(24),dp(3),paint);
+        }
+    }
     private List<Entry> entries(){
         List<Entry> list=new ArrayList<>();
         if(data.optBoolean("configured"))for(int i=0;i<courses().length();i++){
@@ -102,7 +109,7 @@ public class MainActivity extends Activity {
             List<Entry> items=new ArrayList<>();for(Entry e:list)if((e.allDay?0:e.minute<720?1:2)==group)items.add(e);if(items.isEmpty())continue;
             space(body,12);body.addView(text("◷  "+new String[]{"全天","上午","下午"}[group]+"  "+items.size(),15,MUTED,false));space(body,12);
             for(Entry e:items){
-                LinearLayout line=row();line.setGravity(Gravity.TOP);LinearLayout clock=column();clock.setPadding(0,dp(14),dp(7),0);TextView time=text(e.allDay?"•":e.time.substring(0,5),15,e.allDay?BLUE:INK,true);clock.addView(time);TextView dot=text("      •",18,BLUE,true);clock.addView(dot);line.addView(clock,new LinearLayout.LayoutParams(dp(66),-1));
+                LinearLayout line=row();line.setGravity(Gravity.TOP);LinearLayout clock=new TimelineRail();clock.setPadding(0,dp(14),dp(7),0);TextView time=text(e.allDay?"":e.time.substring(0,5),15,INK,true);clock.addView(time);line.addView(clock,new LinearLayout.LayoutParams(dp(66),-1));
                 LinearLayout card=column();card.setPadding(dp(17),dp(18),dp(17),dp(18));card.setBackground(shape(e.done?0xffebedf3:Color.WHITE,24));
                 LinearLayout top=row();TextView name=text(e.title,19,e.done?MUTED:INK,true);if(e.done)name.setPaintFlags(name.getPaintFlags()|android.graphics.Paint.STRIKE_THRU_TEXT_FLAG);top.addView(name,new LinearLayout.LayoutParams(0,-2,1));TextView tag=text(e.course?"课程":e.done?"已完成":"待办",12,BLUE,false);tag.setPadding(dp(8),dp(4),dp(8),dp(4));tag.setBackground(shape(0xffedf4ff,9));top.addView(tag);card.addView(top);space(card,7);
                 card.addView(text((e.allDay?"全天":e.time)+(e.note.isEmpty()?"":" · "+e.note),13,MUTED,false));

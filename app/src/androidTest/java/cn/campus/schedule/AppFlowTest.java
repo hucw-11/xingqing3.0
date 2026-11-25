@@ -44,7 +44,8 @@ public class AppFlowTest {
         screenshot(inst,context,"agenda");
         onView(withText("实验室开会")).perform(scrollTo(),click());
         // The form has multiple EditTexts; use the title's current text to select the correct field.
-        onView(withText("实验室开会")).perform(replaceText("项目讨论会"),closeSoftKeyboard());
+        onView(withText("实验室开会")).perform(replaceText("项目讨论会"));
+        onView(isRoot()).perform(closeSoftKeyboard());
         onView(withText("保存")).perform(click());
         onView(withText("项目讨论会")).perform(scrollTo()).check(matches(isDisplayed()));
         inst.runOnMainSync(first::finish);inst.waitForIdleSync();MainActivity second=launch(inst,context);
