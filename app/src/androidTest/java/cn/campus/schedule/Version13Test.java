@@ -11,7 +11,8 @@ import java.io.*;
 import java.time.*;
 import java.util.*;
 import static org.junit.Assert.*;
-import static androidx.test.espresso.Espresso.*;
+import static androidx.test.espresso.Espresso.onView;
+import static androidx.test.espresso.Espresso.pressBack;
 import static androidx.test.espresso.action.ViewActions.*;
 import static androidx.test.espresso.matcher.ViewMatchers.*;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
@@ -20,6 +21,7 @@ import static androidx.test.espresso.assertion.ViewAssertions.matches;
 public class Version13Test {
     final Instrumentation inst=InstrumentationRegistry.getInstrumentation();final Context context=inst.getTargetContext();MainActivity main;AiActivity ai;
     @Before public void open(){context.getSharedPreferences("MainActivity",0).edit().clear().commit();context.getSharedPreferences("ai_chat",0).edit().clear().commit();context.getSharedPreferences("reminders",0).edit().clear().putBoolean("summary",false).putBoolean("courses",false).commit();context.getSystemService(NotificationManager.class).cancelAll();main=(MainActivity)inst.startActivitySync(new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));}
+    void shell(String command)throws Exception{try(InputStream in=new android.os.ParcelFileDescriptor.AutoCloseInputStream(inst.getUiAutomation().executeShellCommand(command))){while(in.read()!=-1){}}}
     @After public void close()throws Exception{if(ai!=null)inst.runOnMainSync(ai::finish);if(main!=null)inst.runOnMainSync(main::finish);context.getSystemService(AlarmManager.class).cancel(ReminderScheduler.alarm(context));context.getSystemService(NotificationManager.class).cancelAll();SecretStore.save(context,"");}
     JSONObject task(String id,boolean all,boolean done,String ddl){return AiProtocol.obj("id",id,"title",id,"date",LocalDate.now().toString(),"allDay",all,"done",done,"start","14:00","end","","deadline",ddl);}
     void screenshot(String name)throws Exception{inst.waitForIdleSync();android.os.SystemClock.sleep(400);File f=new File(context.getExternalFilesDir(null),name+".png");try(FileOutputStream out=new FileOutputStream(f)){inst.getUiAutomation().takeScreenshot().compress(Bitmap.CompressFormat.PNG,100,out);}try(InputStream in=new android.os.ParcelFileDescriptor.AutoCloseInputStream(inst.getUiAutomation().executeShellCommand("cp "+f.getAbsolutePath()+" /data/local/tmp/"+name+".png"))){while(in.read()!=-1){}}}
@@ -34,6 +36,7 @@ public class Version13Test {
         AgendaFeatures.put(data,"configured",true);AgendaFeatures.put(data,"semester","2026-11-23");JSONArray starts=new JSONArray(data.getJSONArray("starts").toString());starts.put(0,"08:45");AgendaFeatures.put(data,"starts",starts);AgendaFeatures.put(data,"courses",new JSONArray().put(AiProtocol.obj("id","course","title","导航技术","room","A301","day",1,"from",1,"to",2,"weeks","1")));JSONObject next=ReminderRules.next(data,LocalDateTime.of(2026,11,23,8,0),true,true);assertEquals("2026-11-23T08:30",next.getString("at"));assertEquals(1,next.getJSONArray("siblings").length());assertEquals("course",next.getJSONArray("siblings").getJSONObject(0).getString("kind"));
     }
     @Test public void backgroundAlarmDeliversOneSummary()throws Exception{
+        if(android.os.Build.VERSION.SDK_INT>=33)shell("pm grant "+context.getPackageName()+" android.permission.POST_NOTIFICATIONS");if(android.os.Build.VERSION.SDK_INT>=31)shell("appops set "+context.getPackageName()+" SCHEDULE_EXACT_ALARM allow");inst.waitForIdleSync();
         JSONObject data=main.copy();AgendaFeatures.put(data,"events",new JSONArray().put(task("写报告",true,false,LocalDate.now().toString())).put(task("已完成不提醒",true,true,"")));inst.runOnMainSync(()->main.persist(data));inst.runOnMainSync(main::finish);main=null;
         LocalDateTime at=LocalDateTime.now().plusSeconds(2);JSONObject plan=AiProtocol.obj("kind","summary","at",at.toString(),"date",at.toLocalDate().toString(),"key","test-summary");context.getSharedPreferences("reminders",0).edit().putString("plan",plan.toString()).commit();context.getSystemService(AlarmManager.class).setExact(AlarmManager.RTC_WAKEUP,at.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),ReminderScheduler.alarm(context));android.service.notification.StatusBarNotification[] shown={};for(int i=0;i<100;i++){shown=context.getSystemService(NotificationManager.class).getActiveNotifications();if(shown.length>0)break;android.os.SystemClock.sleep(100);}assertEquals(1,shown.length);assertEquals(200,shown[0].getId());assertTrue(shown[0].getNotification().extras.getString(Notification.EXTRA_TITLE).contains("1 项"));assertTrue(shown[0].getNotification().extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)[0].toString().contains("今天截止"));
     }
