@@ -23,7 +23,7 @@ public class NewFeaturesTest {
     final Instrumentation inst=InstrumentationRegistry.getInstrumentation();
     final Context context=inst.getTargetContext();
     MainActivity main;
-    @Before public void open(){context.getSharedPreferences("MainActivity",0).edit().clear().commit();main=(MainActivity)inst.startActivitySync(new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));}
+    @Before public void open(){context.getSharedPreferences("MainActivity",0).edit().clear().commit();main=(MainActivity)inst.startActivitySync(new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));inst.waitForIdleSync();onView(isRoot()).check(matches(isDisplayed()));}
     @After public void close(){if(main!=null)inst.runOnMainSync(main::finish);}
     JSONObject event(String title)throws Exception{return new JSONObject().put("id","repeat").put("date",LocalDate.now().toString()).put("title",title).put("start","14:00").put("end","").put("allDay",false).put("repeat","daily").put("interval",1).put("count",3).put("done",false);}
     @Test public void independentCompletionAndFutureDeletion()throws Exception{
@@ -48,7 +48,7 @@ public class NewFeaturesTest {
     MoodActivity journal(){return (MoodActivity)inst.startActivitySync(new Intent(context,MoodActivity.class).putExtra("date",LocalDate.now().toString()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));}
     @Test public void createRepeatingActivityWithTwoLabels()throws Exception{
         inst.runOnMainSync(()->main.features.eventForm(null));
-        onView(withContentDescription("日程标题")).perform(replaceText("每日学习与锻炼"));onView(isRoot()).perform(closeSoftKeyboard());
+        onView(withContentDescription("日程标题")).inRoot(androidx.test.espresso.matcher.RootMatchers.isDialog()).perform(replaceText("每日学习与锻炼"));onView(isRoot()).inRoot(androidx.test.espresso.matcher.RootMatchers.isDialog()).perform(closeSoftKeyboard());
         onView(withText("选择活动标签")).perform(scrollTo(),click());onView(withText("学习")).perform(click());onView(withText("锻炼")).perform(click());onView(withText("确定")).perform(click());
         onView(withContentDescription("重复方式")).perform(scrollTo(),click());onData(is("每天／每隔几天")).inRoot(androidx.test.espresso.matcher.RootMatchers.isPlatformPopup()).perform(click());
         onView(withContentDescription("重复结束方式")).perform(scrollTo(),click());onData(is("共执行若干次")).inRoot(androidx.test.espresso.matcher.RootMatchers.isPlatformPopup()).perform(click());
