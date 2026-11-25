@@ -22,12 +22,25 @@ jobs:
         with:
           gradle-version: '8.9'
       - name: Preserve development signing key between builds
-        uses: actions/cache@v4
+        id: signing
+        uses: actions/cache/restore@v4
         with:
-          path: ~/.android/debug.keystore
-          key: student-schedule-development-signing-v1
+          path: .signing/development.keystore
+          key: student-schedule-explicit-signing-v2
+      - name: Prepare fixed development signing key
+        run: |
+          mkdir -p .signing
+          if [ ! -f .signing/development.keystore ]; then
+            keytool -genkeypair -keystore .signing/development.keystore -storepass android -keypass android -alias androiddebugkey -dname 'CN=Android Debug,O=Android,C=US' -keyalg RSA -keysize 2048 -validity 10000
+          fi
+      - name: Save signing key before device cleanup
+        if: steps.signing.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .signing/development.keystore
+          key: student-schedule-explicit-signing-v2
       - name: Tests, lint and APK
-        run: gradle --no-daemon testDebugUnitTest lintDebug assembleDebug
+        run: gradle --no-daemon testDebugUnitTest lintDebug assembleDebug signingReport
       - uses: actions/upload-artifact@v4
         with:
           name: student-schedule-apk

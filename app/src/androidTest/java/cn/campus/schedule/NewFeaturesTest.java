@@ -13,6 +13,8 @@ import java.io.*;
 import java.time.LocalDate;
 import static org.junit.Assert.*;
 import static androidx.test.espresso.Espresso.onView;
+import static androidx.test.espresso.Espresso.onData;
+import static org.hamcrest.Matchers.is;
 import static androidx.test.espresso.action.ViewActions.*;
 import static androidx.test.espresso.matcher.ViewMatchers.*;
 
@@ -39,10 +41,20 @@ public class NewFeaturesTest {
         assertTrue(AgendaFeatures.occurrence(main.events().optJSONObject(0),today).optBoolean("done"));
     }
     void screenshot(String name)throws Exception{
+        android.os.SystemClock.sleep(400);
         inst.waitForIdleSync();File f=new File(context.getExternalFilesDir(null),name+".png");try(FileOutputStream out=new FileOutputStream(f)){inst.getUiAutomation().takeScreenshot().compress(Bitmap.CompressFormat.PNG,100,out);}
         try(InputStream in=new android.os.ParcelFileDescriptor.AutoCloseInputStream(inst.getUiAutomation().executeShellCommand("cp "+f.getAbsolutePath()+" /data/local/tmp/"+name+".png"))){while(in.read()!=-1){}}
     }
     MoodActivity journal(){return (MoodActivity)inst.startActivitySync(new Intent(context,MoodActivity.class).putExtra("date",LocalDate.now().toString()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));}
+    @Test public void createRepeatingActivityWithTwoLabels()throws Exception{
+        inst.runOnMainSync(()->main.features.eventForm(null));
+        onView(withContentDescription("日程标题")).perform(replaceText("每日学习与锻炼"));onView(isRoot()).perform(closeSoftKeyboard());
+        onView(withText("选择活动标签")).perform(scrollTo(),click());onView(withText("学习")).perform(click());onView(withText("锻炼")).perform(click());onView(withText("确定")).perform(click());
+        onView(withContentDescription("重复方式")).perform(scrollTo(),click());onData(is("每天／每隔几天")).perform(click());
+        onView(withContentDescription("重复结束方式")).perform(scrollTo(),click());onData(is("共执行若干次")).perform(click());
+        onView(withContentDescription("执行次数（不是天数）")).perform(scrollTo(),replaceText("3"));onView(isRoot()).perform(closeSoftKeyboard());screenshot("repeat-editor");onView(withText("保存")).perform(click());
+        JSONObject task=main.events().getJSONObject(0);assertEquals(2,task.getJSONArray("tags").length());assertTrue(AgendaFeatures.occurs(task,LocalDate.now().plusDays(2)));assertFalse(AgendaFeatures.occurs(task,LocalDate.now().plusDays(3)));
+    }
     @Test public void longDraftAndPhotoSurviveOriginalDeletion()throws Exception{
         MoodActivity first=journal();StringBuilder longText=new StringBuilder();for(int i=0;i<80;i++)longText.append("今天的学习和生活值得认真记录。这是一篇可以持续写下去的长日记。\n");String content=longText.toString();
         onView(withContentDescription("标题（可选）")).perform(replaceText("平凡而充实的一天"));
