@@ -22,6 +22,7 @@ public class MainActivity extends Activity {
     LocalDate selected=LocalDate.now();
     boolean timetable=false;
     LinearLayout root,body;
+    ScrollView pageScroll;
     AgendaFeatures features;
     int dp(float n){ return (int)(n*getResources().getDisplayMetrics().density+.5f); }
     JSONObject obj(Object... pairs) {
@@ -70,7 +71,7 @@ public class MainActivity extends Activity {
         month.setOnClickListener(v->{if(timetable)settings();else pickDate(selected,d->{selected=d;render();});});
         LinearLayout arrows=row();arrows.setBackground(shape(0xffe6e8ee,28));arrows.addView(action("‹",()->{selected=selected.minusWeeks(1);render();}));arrows.addView(action("›",()->{selected=selected.plusWeeks(1);render();}));controls.addView(arrows);root.addView(controls);space(root,12);
         if(!timetable) weekStrip();
-        ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setClipToPadding(false);body=column();body.setPadding(0,dp(12),0,dp(20));scroll.addView(body);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+        ScrollView scroll=new ScrollView(this);pageScroll=scroll;scroll.setFillViewport(true);scroll.setClipToPadding(false);body=column();body.setPadding(0,dp(12),0,dp(20));scroll.addView(body);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         if(timetable)drawTable();else drawAgenda();
         LinearLayout nav=row();nav.setPadding(dp(5),dp(5),dp(5),dp(5));nav.setBackground(shape(Color.WHITE,40));nav.setElevation(dp(4));
         for(int i=0;i<3;i++){if(i==2){TextView ai=action("✧  AI",()->startActivity(new android.content.Intent(this,AiActivity.class).putExtra("date",selected.toString())));ai.setTextSize(17);nav.addView(ai,new LinearLayout.LayoutParams(0,dp(52),1));continue;}final boolean page=i==0;TextView tab=text((i==0?"▥  课表":"▣  日程"),17,timetable==page?BLUE:MUTED,true);tab.setGravity(Gravity.CENTER);if(timetable==page)tab.setBackground(shape(0xffe2edfc,32));tab.setOnClickListener(v->{timetable=page;render();});nav.addView(tab,new LinearLayout.LayoutParams(0,dp(52),1));}root.addView(nav);

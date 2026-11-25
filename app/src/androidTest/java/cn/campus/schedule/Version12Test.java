@@ -46,4 +46,9 @@ public class Version12Test {
         try{AiProtocol.action(AiProtocol.obj("kind","event","date",LocalDate.now().toString(),"title","未给时间"));fail();}catch(IllegalArgumentException expected){}
         assertEquals(0,main.events().length());
     }
+    @Test public void aiContextExcludesOtherDatesAndUnselectedImages()throws Exception{
+        LocalDate today=LocalDate.now();inst.runOnMainSync(()->{JSONObject next=main.copy();next.optJSONArray("moods").put(AiProtocol.obj("id","today","date",today.toString(),"time","10:00","body","今天授权的文字","photos",new JSONArray().put("private-photo.jpg")));next.optJSONArray("moods").put(AiProtocol.obj("id","other","date",today.minusDays(2).toString(),"body","范围外的私密日记"));main.persist(next);});
+        JSONObject snapshot=AiProtocol.context(main.data,today,today);assertTrue(snapshot.toString().contains("今天授权的文字"));assertFalse(snapshot.toString().contains("范围外的私密日记"));assertFalse(snapshot.toString().contains("private-photo.jpg"));assertFalse(snapshot.toString().contains("photos"));
+        try{AiProtocol.context(main.data,today.minusDays(31),today);fail();}catch(IllegalArgumentException expected){}
+    }
 }
