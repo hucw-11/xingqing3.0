@@ -12,6 +12,8 @@ import org.json.*;
 import java.time.LocalDate;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileInputStream;
+import android.os.ParcelFileDescriptor;
 import java.util.Arrays;
 import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.action.ViewActions.*;
@@ -27,6 +29,8 @@ public class AppFlowTest {
         inst.waitForIdleSync();
         Bitmap image=inst.getUiAutomation().takeScreenshot();
         try(FileOutputStream out=new FileOutputStream(new File(context.getExternalFilesDir(null),name+".png"))){image.compress(Bitmap.CompressFormat.PNG,100,out);}
+        // Gradle uninstalls the tested app at the end; retain screenshots outside its data directory.
+        try(ParcelFileDescriptor result=inst.getUiAutomation().executeShellCommand("cp "+new File(context.getExternalFilesDir(null),name+".png").getAbsolutePath()+" /data/local/tmp/"+name+".png");FileInputStream stream=new FileInputStream(result.getFileDescriptor())){while(stream.read()!=-1){ /* wait for copy */ }}
     }
     @Test public void courseAgendaEditAndRestart() throws Exception {
         Instrumentation inst=InstrumentationRegistry.getInstrumentation();Context context=inst.getTargetContext();LocalDate today=LocalDate.now();

@@ -2,8 +2,13 @@
 set -euo pipefail
 collect() {
   mkdir -p screenshots
-  adb pull /sdcard/Android/data/cn.campus.schedule/files/. screenshots/ || true
+  adb pull /data/local/tmp/agenda.png screenshots/ || true
+  adb pull /data/local/tmp/timetable.png screenshots/ || true
   adb logcat -d -s AndroidRuntime:E > screenshots/crashes.txt || true
 }
 trap collect EXIT
 gradle --no-daemon connectedDebugAndroidTest
+trap - EXIT
+collect
+test -s screenshots/agenda.png
+test -s screenshots/timetable.png
