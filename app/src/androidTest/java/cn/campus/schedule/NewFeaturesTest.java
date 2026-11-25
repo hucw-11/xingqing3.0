@@ -50,8 +50,8 @@ public class NewFeaturesTest {
         inst.runOnMainSync(()->main.features.eventForm(null));
         onView(withContentDescription("日程标题")).perform(replaceText("每日学习与锻炼"));onView(isRoot()).perform(closeSoftKeyboard());
         onView(withText("选择活动标签")).perform(scrollTo(),click());onView(withText("学习")).perform(click());onView(withText("锻炼")).perform(click());onView(withText("确定")).perform(click());
-        onView(withContentDescription("重复方式")).perform(scrollTo(),click());onData(is("每天／每隔几天")).perform(click());
-        onView(withContentDescription("重复结束方式")).perform(scrollTo(),click());onData(is("共执行若干次")).perform(click());
+        onView(withContentDescription("重复方式")).perform(scrollTo(),click());onData(is("每天／每隔几天")).inRoot(androidx.test.espresso.matcher.RootMatchers.isPlatformPopup()).perform(click());
+        onView(withContentDescription("重复结束方式")).perform(scrollTo(),click());onData(is("共执行若干次")).inRoot(androidx.test.espresso.matcher.RootMatchers.isPlatformPopup()).perform(click());
         onView(withContentDescription("执行次数（不是天数）")).perform(scrollTo(),replaceText("3"));onView(isRoot()).perform(closeSoftKeyboard());screenshot("repeat-editor");onView(withText("保存")).perform(click());
         JSONObject task=main.events().getJSONObject(0);assertEquals(2,task.getJSONArray("tags").length());assertTrue(AgendaFeatures.occurs(task,LocalDate.now().plusDays(2)));assertFalse(AgendaFeatures.occurs(task,LocalDate.now().plusDays(3)));
     }

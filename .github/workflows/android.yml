@@ -42,6 +42,11 @@ jobs:
             fi
             keytool -genkeypair -keystore .signing/development.keystore -storepass android -keypass android -alias androiddebugkey -dname 'CN=Android Debug,O=Android,C=US' -keyalg RSA -keysize 2048 -validity 10000
           fi
+          if [ -f scripts/signing-certificate.txt ]; then
+            expected=$(tr -d '\r\n' < scripts/signing-certificate.txt)
+            actual=$(keytool -exportcert -keystore .signing/development.keystore -storepass android -alias androiddebugkey | sha256sum | cut -d ' ' -f 1)
+            test "$expected" = "$actual"
+          fi
       - name: Save signing key before device cleanup
         if: steps.signing.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
