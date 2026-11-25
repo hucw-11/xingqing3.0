@@ -17,6 +17,7 @@ import static androidx.test.espresso.Espresso.onData;
 import static org.hamcrest.Matchers.is;
 import static androidx.test.espresso.action.ViewActions.*;
 import static androidx.test.espresso.matcher.ViewMatchers.*;
+import static androidx.test.espresso.assertion.ViewAssertions.matches;
 
 @RunWith(AndroidJUnit4.class)
 public class NewFeaturesTest {
