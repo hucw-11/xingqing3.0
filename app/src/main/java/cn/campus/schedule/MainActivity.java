@@ -42,15 +42,15 @@ public class MainActivity extends Activity {
         try { data=saved==null?obj("semester",ScheduleRules.monday(LocalDate.now()).toString(),"configured",false,"totalWeeks",20,"starts",new JSONArray(Arrays.asList(DEFAULT_START)),"ends",new JSONArray(Arrays.asList(DEFAULT_END)),"courses",new JSONArray(),"events",new JSONArray()):new JSONObject(saved); }
         catch(JSONException e){ new AlertDialog.Builder(this).setTitle("数据读取失败").setMessage("原始数据已保留，请重新启动或联系开发者。").setPositiveButton("关闭",(d,w)->finish()).setCancelable(false).show(); return; }
         if(state!=null){selected=LocalDate.parse(state.getString("selected",selected.toString()));timetable=state.getBoolean("timetable");}
-        if(getIntent().hasExtra("page"))timetable=getIntent().getStringExtra("page").equals("table");features=new AgendaFeatures(this);features.migrate();render();
+        if(getIntent().hasExtra("date"))selected=LocalDate.parse(getIntent().getStringExtra("date"));if(getIntent().hasExtra("page"))timetable=getIntent().getStringExtra("page").equals("table");features=new AgendaFeatures(this);features.migrate();render();
     }
     @Override protected void onSaveInstanceState(Bundle out){super.onSaveInstanceState(out);out.putString("selected",selected.toString());out.putBoolean("timetable",timetable);}
     @Override protected void onActivityResult(int request,int result,android.content.Intent intent){super.onActivityResult(request,result,intent);new TimetableTransfer(this).result(request,result,intent);}
-    @Override protected void onNewIntent(android.content.Intent intent){super.onNewIntent(intent);setIntent(intent);if(intent.hasExtra("page"))timetable="table".equals(intent.getStringExtra("page"));render();}
-    @Override protected void onResume(){super.onResume();if(features!=null){try{data=new JSONObject(getPreferences(0).getString("data",data.toString()));}catch(JSONException ignored){}render();}}
+    @Override protected void onNewIntent(android.content.Intent intent){super.onNewIntent(intent);setIntent(intent);if(intent.hasExtra("date"))selected=LocalDate.parse(intent.getStringExtra("date"));if(intent.hasExtra("page"))timetable="table".equals(intent.getStringExtra("page"));render();}
+    @Override protected void onResume(){super.onResume();if(features!=null){try{data=new JSONObject(getPreferences(0).getString("data",data.toString()));}catch(JSONException ignored){}ReminderScheduler.schedule(this);render();}}
     boolean persist(JSONObject next){
         if(!getPreferences(MODE_PRIVATE).edit().putString("data",next.toString()).commit()){toast("保存失败，请重试");return false;}
-        data=next;return true;
+        data=next;ReminderScheduler.schedule(this);return true;
     }
     JSONObject copy(){try{return new JSONObject(data.toString());}catch(JSONException e){throw new IllegalStateException(e);}}
     GradientDrawable shape(int color,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));return d;}
@@ -71,7 +71,7 @@ public class MainActivity extends Activity {
         month.setOnClickListener(v->{if(timetable)settings();else pickDate(selected,d->{selected=d;render();});});
         LinearLayout arrows=row();arrows.setBackground(shape(0xffe6e8ee,28));arrows.addView(action("‹",()->{selected=selected.minusWeeks(1);render();}));arrows.addView(action("›",()->{selected=selected.plusWeeks(1);render();}));controls.addView(arrows);root.addView(controls);space(root,12);
         if(!timetable) weekStrip();
-        ScrollView scroll=new ScrollView(this);pageScroll=scroll;scroll.setFillViewport(true);scroll.setClipToPadding(false);body=column();body.setPadding(0,dp(12),0,dp(20));scroll.addView(body);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+        ScrollView scroll=new ScrollView(this);pageScroll=scroll;scroll.setFillViewport(true);scroll.setClipToPadding(false);body=column();body.setPadding(0,dp(12),0,dp(20));scroll.addView(body);FrameLayout contentFrame=new FrameLayout(this);contentFrame.addView(scroll,new FrameLayout.LayoutParams(-1,-1));root.addView(contentFrame,new LinearLayout.LayoutParams(-1,0,1));if(!timetable){body.setPadding(0,dp(12),0,dp(96));TextView fab=action("＋",features::plus);fab.setContentDescription("创建日程或心情");fab.setTextSize(30);fab.setTextColor(Color.WHITE);fab.setBackground(shape(BLUE,30));fab.setElevation(dp(6));FrameLayout.LayoutParams fp=new FrameLayout.LayoutParams(dp(56),dp(56),Gravity.BOTTOM|Gravity.END);fp.setMargins(dp(12),dp(12),dp(12),dp(12));contentFrame.addView(fab,fp);}
         if(timetable)drawTable();else drawAgenda();
         LinearLayout nav=row();nav.setPadding(dp(5),dp(5),dp(5),dp(5));nav.setBackground(shape(Color.WHITE,40));nav.setElevation(dp(4));
         for(int i=0;i<3;i++){if(i==2){TextView ai=action("✧  AI",()->startActivity(new android.content.Intent(this,AiActivity.class).putExtra("date",selected.toString())));ai.setTextSize(17);nav.addView(ai,new LinearLayout.LayoutParams(0,dp(52),1));continue;}final boolean page=i==0;TextView tab=text((i==0?"▥  课表":"▣  日程"),17,timetable==page?BLUE:MUTED,true);tab.setGravity(Gravity.CENTER);if(timetable==page)tab.setBackground(shape(0xffe2edfc,32));tab.setOnClickListener(v->{timetable=page;render();});nav.addView(tab,new LinearLayout.LayoutParams(0,dp(52),1));}root.addView(nav);
@@ -110,12 +110,12 @@ public class MainActivity extends Activity {
     }
     void drawAgenda(){
         features.controls();space(body,8);
-        LinearLayout heading=row();String prefix=selected.equals(LocalDate.now())?"今天 · ":"";heading.addView(text(prefix+selected.getMonthValue()+"月"+selected.getDayOfMonth()+"日 周"+DAYS[selected.getDayOfWeek().getValue()-1],20,INK,true),new LinearLayout.LayoutParams(0,-2,1));TextView plus=action("＋",features::plus);plus.setBackground(shape(0xffdeebfc,30));heading.addView(plus);body.addView(heading);space(body,8);
+        LinearLayout heading=row();String prefix=selected.equals(LocalDate.now())?"今天 · ":"";heading.addView(text(prefix+selected.getMonthValue()+"月"+selected.getDayOfMonth()+"日 周"+DAYS[selected.getDayOfWeek().getValue()-1],20,INK,true),new LinearLayout.LayoutParams(0,-2,1));body.addView(heading);space(body,8);
         List<Entry> list=entries();body.addView(text(list.size()+" 个安排 · 把今天过得从容一点",13,MUTED,false));space(body,14);
         if(list.isEmpty()){space(body,65);TextView empty=text("今天，留一点空白\n\n点击 ＋ 添加安排",18,MUTED,false);empty.setGravity(Gravity.CENTER);body.addView(empty);if(!data.optBoolean("configured")){space(body,20);body.addView(action("设置学期，让课程自动出现",this::settings));}return;}
-        for(int group=0;group<3;group++){
-            List<Entry> items=new ArrayList<>();for(Entry e:list)if((e.allDay?0:e.minute<720?1:2)==group)items.add(e);if(items.isEmpty())continue;
-            space(body,12);body.addView(text("◷  "+new String[]{"全天","上午","下午"}[group]+"  "+items.size(),15,MUTED,false));space(body,12);
+        for(int group=0;group<4;group++){
+            List<Entry> items=new ArrayList<>();for(Entry e:list)if(DaySections.group(e.allDay,e.minute)==group)items.add(e);if(items.isEmpty())continue;
+            space(body,12);body.addView(text("◷  "+new String[]{"全天","上午","下午","晚上"}[group]+"  "+items.size(),15,MUTED,false));space(body,12);
             for(Entry e:items){
                 if(e.mood){features.moodCard(e);continue;}
                 LinearLayout line=row();line.setGravity(Gravity.TOP);LinearLayout clock=new TimelineRail();clock.setPadding(0,dp(14),dp(7),0);TextView time=text(e.allDay?"":e.time.substring(0,5),15,INK,true);clock.addView(time);line.addView(clock,new LinearLayout.LayoutParams(dp(66),-1));
@@ -172,7 +172,7 @@ public class MainActivity extends Activity {
     void timePicker(TextView button,String[] values,int index){String value=values[index].isEmpty()?"15:00":values[index];new TimePickerDialog(this,(p,h,m)->{values[index]=String.format(Locale.ROOT,"%02d:%02d",h,m);button.setText(values[index]);},Integer.parseInt(value.substring(0,2)),Integer.parseInt(value.substring(3)),true).show();}
     void eventForm(JSONObject e){ features.eventForm(e); }
     void settings(){
-        LinearLayout f=form();f.addView(action("课表导入／导出",()->new TimetableTransfer(this).menu()));f.addView(text("开学日期所在的周记为第 1 周，周一开始。",13,MUTED,false));LocalDate[] date={semester()};TextView dateButton=text(date[0].toString()+"  ›",18,BLUE,true);f.addView(dateButton,new LinearLayout.LayoutParams(-1,dp(56)));dateButton.setGravity(Gravity.CENTER_VERTICAL);dateButton.setOnClickListener(v->pickDate(date[0],d->{date[0]=d;dateButton.setText(d.toString()+"  ›");}));EditText count=field(f,"学期周数（1–52）",""+totalWeeks());count.setInputType(2);f.addView(text("每节课时间 · 点击修改",16,INK,true));space(f,10);
+        LinearLayout f=form();f.addView(action("提醒设置",()->ReminderSettings.show(this)));f.addView(action("课表导入／导出",()->new TimetableTransfer(this).menu()));f.addView(text("开学日期所在的周记为第 1 周，周一开始。",13,MUTED,false));LocalDate[] date={semester()};TextView dateButton=text(date[0].toString()+"  ›",18,BLUE,true);f.addView(dateButton,new LinearLayout.LayoutParams(-1,dp(56)));dateButton.setGravity(Gravity.CENTER_VERTICAL);dateButton.setOnClickListener(v->pickDate(date[0],d->{date[0]=d;dateButton.setText(d.toString()+"  ›");}));EditText count=field(f,"学期周数（1–52）",""+totalWeeks());count.setInputType(2);f.addView(text("每节课时间 · 点击修改",16,INK,true));space(f,10);
         String[] times=new String[24];for(int i=0;i<12;i++){times[i*2]=start(i+1);times[i*2+1]=end(i+1);LinearLayout r=row();r.addView(text("第 "+(i+1)+" 节",14,INK,true),new LinearLayout.LayoutParams(dp(60),dp(48)));for(int j=0;j<2;j++){final int index=i*2+j;TextView button=action(times[index],()->{});button.setTextSize(16);button.setOnClickListener(v->timePicker(button,times,index));r.addView(button,new LinearLayout.LayoutParams(0,dp(48),1));}f.addView(r);}
         AlertDialog dialog=dialog("学期与节次设置",f,()->{
             int weeks;try{weeks=Integer.parseInt(count.getText().toString());}catch(NumberFormatException e){throw new IllegalArgumentException("请输入有效周数");}if(weeks<1||weeks>52)throw new IllegalArgumentException("学期周数须为 1–52");
