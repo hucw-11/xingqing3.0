@@ -4,6 +4,8 @@ collect() {
   mkdir -p screenshots
   adb pull /data/local/tmp/agenda.png screenshots/ || true
   adb pull /data/local/tmp/timetable.png screenshots/ || true
+  adb pull /data/local/tmp/mood-editor.png screenshots/ || true
+  adb pull /data/local/tmp/mood-timeline.png screenshots/ || true
   adb logcat -d -s AndroidRuntime:E > screenshots/crashes.txt || true
 }
 trap collect EXIT
