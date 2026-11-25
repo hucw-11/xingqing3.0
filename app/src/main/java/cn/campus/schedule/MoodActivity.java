@@ -26,7 +26,7 @@ public class MoodActivity extends Activity {
     final java.util.concurrent.ExecutorService io=java.util.concurrent.Executors.newSingleThreadExecutor();
     int dp(int n){return (int)(n*getResources().getDisplayMetrics().density+.5f);}
     TextView text(String value,int size){TextView v=new TextView(this);v.setText(value);v.setTextSize(size);v.setTextColor(0xff171c26);return v;}
-    LinearLayout col(){LinearLayout l=new LinearLayout(this);l.setOrientation(1);return l;}
+    LinearLayout col(){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);return l;}
     TextView button(String value,Runnable action){TextView v=text(value,16);v.setTextColor(0xff0868ce);v.setPadding(dp(8),dp(14),dp(8),dp(14));v.setGravity(Gravity.CENTER);v.setOnClickListener(w->action.run());return v;}
     void error(String message){Toast.makeText(this,message,Toast.LENGTH_LONG).show();}
     static void put(JSONObject o,String k,Object v){AgendaFeatures.put(o,k,v);}
