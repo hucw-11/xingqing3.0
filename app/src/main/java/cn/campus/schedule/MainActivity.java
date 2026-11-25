@@ -13,6 +13,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 public class MainActivity extends Activity {
+    @Override public android.content.SharedPreferences getPreferences(int mode){return getSharedPreferences("MainActivity",mode);}
     final int BG=0xfff3f4f8, BLUE=0xff0868ce, INK=0xff171c26, MUTED=0xff858a96;
     final String[] DAYS={"一","二","三","四","五","六","日"};
     final String[] DEFAULT_START={"08:00","08:50","09:50","10:40","11:30","14:00","14:50","15:45","16:35","19:00","19:50","20:40"};
@@ -40,9 +41,11 @@ public class MainActivity extends Activity {
         try { data=saved==null?obj("semester",ScheduleRules.monday(LocalDate.now()).toString(),"configured",false,"totalWeeks",20,"starts",new JSONArray(Arrays.asList(DEFAULT_START)),"ends",new JSONArray(Arrays.asList(DEFAULT_END)),"courses",new JSONArray(),"events",new JSONArray()):new JSONObject(saved); }
         catch(JSONException e){ new AlertDialog.Builder(this).setTitle("数据读取失败").setMessage("原始数据已保留，请重新启动或联系开发者。").setPositiveButton("关闭",(d,w)->finish()).setCancelable(false).show(); return; }
         if(state!=null){selected=LocalDate.parse(state.getString("selected",selected.toString()));timetable=state.getBoolean("timetable");}
-        features=new AgendaFeatures(this);features.migrate();render();
+        if(getIntent().hasExtra("page"))timetable=getIntent().getStringExtra("page").equals("table");features=new AgendaFeatures(this);features.migrate();render();
     }
     @Override protected void onSaveInstanceState(Bundle out){super.onSaveInstanceState(out);out.putString("selected",selected.toString());out.putBoolean("timetable",timetable);}
+    @Override protected void onActivityResult(int request,int result,android.content.Intent intent){super.onActivityResult(request,result,intent);new TimetableTransfer(this).result(request,result,intent);}
+    @Override protected void onNewIntent(android.content.Intent intent){super.onNewIntent(intent);setIntent(intent);if(intent.hasExtra("page"))timetable="table".equals(intent.getStringExtra("page"));render();}
     @Override protected void onResume(){super.onResume();if(features!=null){try{data=new JSONObject(getPreferences(0).getString("data",data.toString()));}catch(JSONException ignored){}render();}}
     boolean persist(JSONObject next){
         if(!getPreferences(MODE_PRIVATE).edit().putString("data",next.toString()).commit()){toast("保存失败，请重试");return false;}
@@ -70,7 +73,7 @@ public class MainActivity extends Activity {
         ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setClipToPadding(false);body=column();body.setPadding(0,dp(12),0,dp(20));scroll.addView(body);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         if(timetable)drawTable();else drawAgenda();
         LinearLayout nav=row();nav.setPadding(dp(5),dp(5),dp(5),dp(5));nav.setBackground(shape(Color.WHITE,40));nav.setElevation(dp(4));
-        for(int i=0;i<2;i++){final boolean page=i==0;TextView tab=text((i==0?"▥  课表":"▣  日程"),17,timetable==page?BLUE:MUTED,true);tab.setGravity(Gravity.CENTER);if(timetable==page)tab.setBackground(shape(0xffe2edfc,32));tab.setOnClickListener(v->{timetable=page;render();});nav.addView(tab,new LinearLayout.LayoutParams(0,dp(52),1));}root.addView(nav);
+        for(int i=0;i<3;i++){if(i==2){TextView ai=action("✧  AI",()->startActivity(new android.content.Intent(this,AiActivity.class).putExtra("date",selected.toString())));ai.setTextSize(17);nav.addView(ai,new LinearLayout.LayoutParams(0,dp(52),1));continue;}final boolean page=i==0;TextView tab=text((i==0?"▥  课表":"▣  日程"),17,timetable==page?BLUE:MUTED,true);tab.setGravity(Gravity.CENTER);if(timetable==page)tab.setBackground(shape(0xffe2edfc,32));tab.setOnClickListener(v->{timetable=page;render();});nav.addView(tab,new LinearLayout.LayoutParams(0,dp(52),1));}root.addView(nav);
     }
     void weekStrip(){
         LinearLayout strip=row();LocalDate monday=ScheduleRules.monday(selected);
@@ -93,13 +96,13 @@ public class MainActivity extends Activity {
         List<Entry> list=new ArrayList<>();
         if(data.optBoolean("configured"))for(int i=0;i<courses().length();i++){
             JSONObject c=courses().optJSONObject(i);
-            if(ScheduleRules.occurs(semester(),selected,c.optInt("day"),ScheduleRules.weeks(c.optString("weeks"),totalWeeks()))){
+            if(CourseRules.occurs(semester(),selected,c,totalWeeks())){
                 Entry e=new Entry();e.source=c;e.course=true;e.title=c.optString("title");e.note=c.optString("room");e.time=start(c.optInt("from"))+"–"+end(c.optInt("to"));e.minute=ScheduleRules.minutes(start(c.optInt("from")));list.add(e);
             }
         }
         for(int i=0;i<events().length();i++){
-            JSONObject s=AgendaFeatures.occurrence(events().optJSONObject(i),selected);if(s==null)continue;
-            Entry e=new Entry();e.source=s;e.title=s.optString("title");e.note=s.optString("note");e.allDay=s.optBoolean("allDay");e.done=s.optBoolean("done");e.time=e.allDay?"全天":s.optString("start")+(s.optString("end").isEmpty()?"":"–"+s.optString("end"));e.minute=e.allDay?-1:ScheduleRules.minutes(s.optString("start"));list.add(e);
+            for(JSONObject s:TaskRules.visible(events().optJSONObject(i),selected,LocalDate.now())){
+            Entry e=new Entry();e.source=s;e.title=s.optString("title");e.note=s.optString("note");e.allDay=s.optBoolean("allDay")||s.optBoolean("carried");e.done=s.optBoolean("done");e.time=e.allDay?"全天":s.optString("start")+(s.optString("end").isEmpty()?"":"–"+s.optString("end"));e.minute=e.allDay?-1:ScheduleRules.minutes(s.optString("start"));list.add(e);}
         }
         JSONArray moods=data.optJSONArray("moods");for(int i=0;i<moods.length();i++){JSONObject m=moods.optJSONObject(i);if(!m.optString("date").equals(selected.toString()))continue;Entry e=new Entry();e.source=m;e.mood=true;e.title=m.optString("title").isEmpty()?"此刻的心情":m.optString("title");e.note=m.optString("body");e.time=m.optString("time");e.minute=ScheduleRules.minutes(e.time);list.add(e);}
         list.removeIf(e->!features.visible(e));list.sort(Comparator.comparingInt(e->e.minute));return list;
@@ -118,7 +121,7 @@ public class MainActivity extends Activity {
                 LinearLayout card=column();card.setPadding(dp(17),dp(18),dp(17),dp(18));card.setBackground(shape(e.done?0xffebedf3:Color.WHITE,24));
                 LinearLayout top=row();TextView name=text(e.title,19,e.done?MUTED:INK,true);if(e.done)name.setPaintFlags(name.getPaintFlags()|android.graphics.Paint.STRIKE_THRU_TEXT_FLAG);top.addView(name,new LinearLayout.LayoutParams(0,-2,1));TextView tag=text(e.course?"课程":e.done?"已完成":"待办",12,BLUE,false);tag.setPadding(dp(8),dp(4),dp(8),dp(4));tag.setBackground(shape(0xffedf4ff,9));top.addView(tag);card.addView(top);space(card,7);
                 card.addView(text((e.allDay?"全天":e.time)+(e.note.isEmpty()?"":" · "+e.note),13,MUTED,false));
-                features.paintTags(card,e.source,e.course);
+                features.paintTags(card,e.source,e.course);if(!e.course)features.taskCard(card,e.source);
                 card.setOnClickListener(v->{if(e.course)new AlertDialog.Builder(this).setTitle(e.title).setItems(new String[]{"编辑课程","记录感受"},(d,w)->{if(w==0)courseForm(e.source,e.source.optInt("day"),e.source.optInt("from"));else features.mood(null,e,true);}).show();else eventForm(e.source);});line.addView(card,new LinearLayout.LayoutParams(0,-2,1));body.addView(line);space(body,12);
             }
         }
@@ -135,7 +138,7 @@ public class MainActivity extends Activity {
             FrameLayout frame=new FrameLayout(this);col.addView(frame,new LinearLayout.LayoutParams(width,dp(83*12)));
             for(int n=1;n<=12;n++){final int period=n;TextView cell=text("",12,MUTED,false);GradientDrawable bg=shape(0xfff7f8fb,0);bg.setStroke(dp(.5f),0xffe4e7ee);cell.setBackground(bg);FrameLayout.LayoutParams p=new FrameLayout.LayoutParams(width,dp(83));p.topMargin=dp((n-1)*83);frame.addView(cell,p);cell.setOnClickListener(v->courseForm(null,weekday,period));}
             for(int i=0;i<courses().length();i++){
-                JSONObject c=courses().optJSONObject(i);if(!ScheduleRules.occurs(semester(),date,c.optInt("day"),ScheduleRules.weeks(c.optString("weeks"),totalWeeks())))continue;
+                JSONObject c=courses().optJSONObject(i);if(!CourseRules.occurs(semester(),date,c,totalWeeks()))continue;
                 TextView block=text(c.optString("title")+"\n\n"+c.optString("room"),12,BLUE,true);block.setPadding(dp(7),dp(10),dp(7),dp(6));block.setBackground(shape(0xffdeebfc,12));block.setGravity(Gravity.TOP);FrameLayout.LayoutParams p=new FrameLayout.LayoutParams(width-dp(4),dp((c.optInt("to")-c.optInt("from")+1)*83)-dp(5));p.topMargin=dp((c.optInt("from")-1)*83)+dp(2);p.leftMargin=dp(2);frame.addView(block,p);block.setOnClickListener(v->courseForm(c,weekday,c.optInt("from")));
             }grid.addView(col);
         }
@@ -154,21 +157,21 @@ public class MainActivity extends Activity {
     void removeButton(LinearLayout f,String collection,JSONObject original,AlertDialog parent){TextView del=action("删除",()->new AlertDialog.Builder(this).setTitle(collection.equals("courses")?"删除这门课程？":"删除这个日程？").setMessage(collection.equals("courses")?"该课程在所有上课周次的安排都会移除。":"删除后无法恢复。").setNegativeButton("取消",null).setPositiveButton("删除",(d,w)->{update(collection,original,null);parent.dismiss();render();}).show());del.setTextColor(0xffc64e57);f.addView(del);}
     void courseForm(JSONObject c,int day,int period){
         LinearLayout f=form();EditText title=field(f,"课程名称",c==null?"":c.optString("title")),room=field(f,"教室",c==null?"":c.optString("room"));
-        f.addView(text("星期",13,MUTED,false));Spinner weekday=new Spinner(this);weekday.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"星期一","星期二","星期三","星期四","星期五","星期六","星期日"}));weekday.setSelection(day-1);f.addView(weekday,new LinearLayout.LayoutParams(-1,dp(48)));
+        f.addView(text("上课星期（可多选）",13,MUTED,false));Set<Integer> courseDays=c==null?new TreeSet<>(Arrays.asList(day)):CourseRules.days(c);CheckBox[] weekday=new CheckBox[7];LinearLayout weekdays=row();for(int i=0;i<7;i++){final int n=i+1;weekday[i]=new CheckBox(this);weekday[i].setText(DAYS[i]);weekday[i].setContentDescription("星期"+DAYS[i]);weekday[i].setChecked(courseDays.contains(n));weekday[i].setOnCheckedChangeListener((v,on)->{if(on)courseDays.add(n);else courseDays.remove(n);});weekdays.addView(weekday[i]);}HorizontalScrollView daysScroll=new HorizontalScrollView(this);daysScroll.addView(weekdays);f.addView(daysScroll);
         EditText from=field(f,"开始节次（1–12）",""+(c==null?period:c.optInt("from"))),to=field(f,"结束节次（1–12）",""+(c==null?period:c.optInt("to")));from.setInputType(2);to.setInputType(2);
         List<String> courseTags=features.tagPicker(f,c,true);EditText weeks=field(f,"上课周次，如 1-16 或 1,3,5-8",c==null?"1-"+totalWeeks():c.optString("weeks"));LinearLayout shortcuts=row();
         for(int parity=0;parity<2;parity++){final int p=parity;TextView b=action(parity==0?"单周":"双周",()->{StringJoiner join=new StringJoiner(",");for(int n=p==0?1:2;n<=totalWeeks();n+=2)join.add(""+n);weeks.setText(join.toString());});shortcuts.addView(b,new LinearLayout.LayoutParams(0,dp(42),1));}f.addView(shortcuts);
         AlertDialog d=dialog(c==null?"添加课程":"编辑课程",f,()->{
             String name=title.getText().toString().trim();if(name.isEmpty())throw new IllegalArgumentException("请填写课程名称");int a,b;try{a=Integer.parseInt(from.getText().toString());b=Integer.parseInt(to.getText().toString());}catch(NumberFormatException e){throw new IllegalArgumentException("请填写有效节次");}if(a<1||b>12||a>b)throw new IllegalArgumentException("节次范围须在 1–12，结束节次不能早于开始");
-            String range=weeks.getText().toString().trim();Set<Integer> chosen;try{chosen=ScheduleRules.weeks(range,totalWeeks());}catch(Exception e){throw new IllegalArgumentException("请检查上课周次，如 1-16 或 1,3,5-8");}
-            for(int i=0;i<courses().length();i++){JSONObject other=courses().optJSONObject(i);if(c!=null&&other.optString("id").equals(c.optString("id")))continue;if(other.optInt("day")==weekday.getSelectedItemPosition()+1&&a<=other.optInt("to")&&b>=other.optInt("from")){Set<Integer> overlap=new HashSet<>(chosen);overlap.retainAll(ScheduleRules.weeks(other.optString("weeks"),totalWeeks()));if(!overlap.isEmpty())throw new IllegalArgumentException("与「"+other.optString("title")+"」的上课时间重叠");}}
-            update("courses",c,obj("id",c==null?UUID.randomUUID().toString():c.optString("id"),"title",name,"room",room.getText().toString().trim(),"day",weekday.getSelectedItemPosition()+1,"from",a,"to",b,"weeks",range,"tags",new JSONArray(courseTags)));
+            if(courseDays.isEmpty())throw new IllegalArgumentException("请选择至少一个上课星期");String range=weeks.getText().toString().trim();Set<Integer> chosen;try{chosen=ScheduleRules.weeks(range,totalWeeks());}catch(Exception e){throw new IllegalArgumentException("请检查上课周次，如 1-16 或 1,3,5-8");}
+            for(int i=0;i<courses().length();i++){JSONObject other=courses().optJSONObject(i);if(c!=null&&other.optString("id").equals(c.optString("id")))continue;if(!Collections.disjoint(courseDays,CourseRules.days(other))&&a<=other.optInt("to")&&b>=other.optInt("from")){Set<Integer> overlap=new HashSet<>(chosen);overlap.retainAll(ScheduleRules.weeks(other.optString("weeks"),totalWeeks()));if(!overlap.isEmpty())throw new IllegalArgumentException("与「"+other.optString("title")+"」的上课时间重叠");}}
+            update("courses",c,obj("id",c==null?UUID.randomUUID().toString():c.optString("id"),"title",name,"room",room.getText().toString().trim(),"day",courseDays.iterator().next(),"days",new JSONArray(courseDays),"from",a,"to",b,"weeks",range,"tags",new JSONArray(courseTags)));
         });if(c!=null)removeButton(f,"courses",c,d);d.show();
     }
     void timePicker(TextView button,String[] values,int index){String value=values[index].isEmpty()?"15:00":values[index];new TimePickerDialog(this,(p,h,m)->{values[index]=String.format(Locale.ROOT,"%02d:%02d",h,m);button.setText(values[index]);},Integer.parseInt(value.substring(0,2)),Integer.parseInt(value.substring(3)),true).show();}
     void eventForm(JSONObject e){ features.eventForm(e); }
     void settings(){
-        LinearLayout f=form();f.addView(text("开学日期所在的周记为第 1 周，周一开始。",13,MUTED,false));LocalDate[] date={semester()};TextView dateButton=text(date[0].toString()+"  ›",18,BLUE,true);f.addView(dateButton,new LinearLayout.LayoutParams(-1,dp(56)));dateButton.setGravity(Gravity.CENTER_VERTICAL);dateButton.setOnClickListener(v->pickDate(date[0],d->{date[0]=d;dateButton.setText(d.toString()+"  ›");}));EditText count=field(f,"学期周数（1–52）",""+totalWeeks());count.setInputType(2);f.addView(text("每节课时间 · 点击修改",16,INK,true));space(f,10);
+        LinearLayout f=form();f.addView(action("课表导入／导出",()->new TimetableTransfer(this).menu()));f.addView(text("开学日期所在的周记为第 1 周，周一开始。",13,MUTED,false));LocalDate[] date={semester()};TextView dateButton=text(date[0].toString()+"  ›",18,BLUE,true);f.addView(dateButton,new LinearLayout.LayoutParams(-1,dp(56)));dateButton.setGravity(Gravity.CENTER_VERTICAL);dateButton.setOnClickListener(v->pickDate(date[0],d->{date[0]=d;dateButton.setText(d.toString()+"  ›");}));EditText count=field(f,"学期周数（1–52）",""+totalWeeks());count.setInputType(2);f.addView(text("每节课时间 · 点击修改",16,INK,true));space(f,10);
         String[] times=new String[24];for(int i=0;i<12;i++){times[i*2]=start(i+1);times[i*2+1]=end(i+1);LinearLayout r=row();r.addView(text("第 "+(i+1)+" 节",14,INK,true),new LinearLayout.LayoutParams(dp(60),dp(48)));for(int j=0;j<2;j++){final int index=i*2+j;TextView button=action(times[index],()->{});button.setTextSize(16);button.setOnClickListener(v->timePicker(button,times,index));r.addView(button,new LinearLayout.LayoutParams(0,dp(48),1));}f.addView(r);}
         AlertDialog dialog=dialog("学期与节次设置",f,()->{
             int weeks;try{weeks=Integer.parseInt(count.getText().toString());}catch(NumberFormatException e){throw new IllegalArgumentException("请输入有效周数");}if(weeks<1||weeks>52)throw new IllegalArgumentException("学期周数须为 1–52");

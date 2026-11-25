@@ -1,5 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application android:theme="@style/AppTheme" android:label="同学日程" android:icon="@drawable/ic_launcher" android:allowBackup="true" android:supportsRtl="true">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <application android:theme="@style/AppTheme" android:label="同学日程" android:icon="@drawable/ic_launcher" android:allowBackup="true" android:fullBackupContent="@xml/backup_rules" android:dataExtractionRules="@xml/data_extraction_rules" android:supportsRtl="true">
+        <activity android:name=".AiActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" android:windowSoftInputMode="adjustResize" />
         <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.photos" android:exported="false" android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/photo_paths" />
         </provider>
