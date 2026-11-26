@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
-let app,page,root,errors;
+let app,page,root,errors=[];
 const screenshot=async name=>{fs.mkdirSync('test-results/screenshots',{recursive:true});await page.screenshot({path:`test-results/screenshots/${name}.png`});};
 async function launch(){app=await electron.launch({args:[path.resolve('.')],env:{...process.env,XINGQING_USER_DATA:root,XINGQING_TEST:'1'}});page=await app.firstWindow();errors=[];page.on('pageerror',e=>errors.push(e.message));await expect(page.locator('#version')).toContainText('1.0.0');page.on('dialog',d=>d.accept());}
 const bridge=(name,p={})=>page.evaluate(({name,p})=>window.xingqing.action(name,p),{name,p});

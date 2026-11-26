@@ -25,6 +25,8 @@ jobs:
         run: |
           if (Test-Path package-lock.json) { npm ci } else { npm install }
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node node_modules/electron/install.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Generate app icon and validate JavaScript
         run: |
           python scripts/create-icon.py
