@@ -48,6 +48,7 @@ final class SyncManager {
     static void synchronize(Context c,CloudBaseClient client,String token,String uid)throws Exception{
         try(SyncLedger ledger=new SyncLedger(c)){
             pull(c,ledger,client,token);
+            downloadPhotos(c,ledger,client,token,uid);
             synchronized(LOCK){if(!enabled(c))return;if(ledger.meta("firstPull").equals("true")){if(ledger.rows().isEmpty())ledger.capture(data(c));ledger.meta("firstPull","false");}else ledger.capture(data(c));}
             for(int pass=0;pass<3;pass++){
                 List<SyncLedger.Row> changes;synchronized(LOCK){changes=ledger.rows();}

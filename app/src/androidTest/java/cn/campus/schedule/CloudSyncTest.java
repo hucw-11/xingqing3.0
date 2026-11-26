@@ -28,12 +28,12 @@ public class CloudSyncTest {
         @Override public boolean deleteDatabase(String name){return super.deleteDatabase(prefix+name);}
     }
     static class Cloud extends CloudBaseClient {
-        final Map<String,JSONObject> rows=new LinkedHashMap<>();final Map<String,byte[]> images=new HashMap<>();long revision;boolean loseAck;int uploads;
+        final Map<String,JSONObject> rows=new LinkedHashMap<>();final Map<String,byte[]> images=new HashMap<>();long revision;boolean loseAck,failDownload;int uploads;
         Cloud(){super("example-env","test-device");}
         @Override JSONArray pull(String token,long after){JSONArray result=new JSONArray();rows.values().stream().filter(r->r.optLong("revision")>after).sorted(Comparator.comparingLong(r->r.optLong("revision"))).forEach(r->result.put(SyncMerge.copy(r)));return result;}
         @Override JSONObject push(String token,SyncLedger.Row r)throws Exception{JSONObject existing=rows.get(r.key);if(existing!=null&&existing.optString("mutation_id").equals(r.mutation))return AiProtocol.obj("accepted",true,"record",SyncMerge.copy(existing));if(existing!=null&&existing.optLong("revision")!=r.revision)return AiProtocol.obj("accepted",false,"record",SyncMerge.copy(existing));JSONObject saved=AiProtocol.obj("record_key",r.key,"payload",r.value==null?JSONObject.NULL:SyncMerge.copy(r.value),"deleted",r.value==null,"revision",++revision,"mutation_id",r.mutation);rows.put(r.key,saved);if(loseAck){loseAck=false;throw new IOException("response lost after commit");}return AiProtocol.obj("accepted",true,"record",SyncMerge.copy(saved));}
         @Override void upload(String token,String uid,String name,byte[] bytes){images.putIfAbsent(name,bytes);uploads++;}
-        @Override byte[] download(String token,String uid,String name)throws IOException{if(!images.containsKey(name))throw new IOException();return images.get(name);}
+        @Override byte[] download(String token,String uid,String name)throws IOException{if(failDownload){failDownload=false;throw new IOException("connection interrupted");}if(!images.containsKey(name))throw new IOException();return images.get(name);}
     }
     JSONObject sample(){return AiProtocol.obj("schema",2,"configured",false,"semester",LocalDate.now().toString(),"courses",new JSONArray(),"events",new JSONArray(),"moods",new JSONArray(),"labels",new JSONArray());}
     @Before public void setup(){a=new Phone(base);b=new Phone(base);cloud=new Cloud();seed(a);seed(b);}
@@ -61,6 +61,12 @@ public class CloudSyncTest {
     }
     @Test public void lostResponseRetriesIdempotentlyAndOutboxPersists()throws Exception{
         JSONObject data=sample();data.getJSONArray("events").put(event("offline"));save(a,data);cloud.loseAck=true;try{sync(a);fail();}catch(IOException expected){}try(SyncLedger ledger=new SyncLedger(a)){assertTrue(ledger.find("events:offline").dirty);}sync(a);sync(b);assertEquals(1,cloud.rows.size());assertEquals(1,SyncManager.data(b).getJSONArray("events").length());try(SyncLedger ledger=new SyncLedger(a)){assertFalse(ledger.find("events:offline").dirty);}
+    }
+    @Test public void interruptedPhotoDownloadRecoversEvenAfterEditingTheDiary()throws Exception{
+        File dir=new File(a.getFilesDir(),"photos");dir.mkdirs();byte[] bytes={5,6,7};Files.write(new File(dir,"partial.jpg").toPath(),bytes);JSONObject data=sample();data.getJSONArray("moods").put(AiProtocol.obj("id","partial","body","原始文字","photos",new JSONArray().put("partial.jpg")));save(a,data);sync(a);cloud.failDownload=true;try{sync(b);fail();}catch(IOException expected){}JSONObject changed=SyncManager.data(b);changed.getJSONArray("moods").getJSONObject(0).put("body","照片未下载完时写的新文字");save(b,changed);sync(b);sync(a);assertEquals("照片未下载完时写的新文字",SyncManager.data(a).getJSONArray("moods").getJSONObject(0).getString("body"));assertArrayEquals(bytes,Files.readAllBytes(new File(b.getFilesDir(),"photos/partial.jpg").toPath()));
+    }
+    @Test public void newPhoneRemapsStudyLabelAndShorterSemesterDoesNotCrash()throws Exception{
+        JSONObject template=sample();template.put("studyLabel","old-phone-label");Map<String,JSONObject> records=new LinkedHashMap<>();records.put("labels:cloud-label",AiProtocol.obj("id","cloud-label","name","学习"));assertEquals("cloud-label",SyncMerge.project(template,records).getString("studyLabel"));LocalDate monday=LocalDate.of(2026,11,23);JSONObject course=AiProtocol.obj("days",new JSONArray().put(1),"weeks","1-30");assertTrue(CourseRules.occurs(monday,monday,course,20));assertFalse(CourseRules.occurs(monday,monday.plusWeeks(20),course,20));
     }
     @Test public void projectionRecoversAfterProcessDeathBeforePreferenceWrite()throws Exception{
         try(SyncLedger ledger=new SyncLedger(a)){ledger.accept(AiProtocol.obj("record_key","events:recover","payload",event("recover"),"revision",1,"mutation_id","other-device"));ledger.meta("projectPending","true");}SyncManager.restore(a);assertEquals("recover",SyncManager.data(a).getJSONArray("events").getJSONObject(0).getString("id"));
