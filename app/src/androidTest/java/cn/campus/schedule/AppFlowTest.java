@@ -43,6 +43,7 @@ public class AppFlowTest {
             .put(new JSONObject().put("id","meeting").put("title","实验室开会").put("date",today.toString()).put("allDay",false).put("start","14:30").put("end","").put("note","实验楼 402").put("done",false)));
         context.getSharedPreferences("MainActivity",Context.MODE_PRIVATE).edit().putString("data",data.toString()).commit();
         MainActivity first=launch(inst,context);
+        if(first.entries().stream().anyMatch(e->e.course&&e.done))onView(withContentDescription("展开或收起已完成安排")).perform(scrollTo(),click());
         onView(withText("现代导航技术")).check(matches(isDisplayed()));
         onView(withText("09:50–11:25 · 教学楼 A301")).check(matches(isDisplayed()));
         screenshot(inst,context,"agenda");

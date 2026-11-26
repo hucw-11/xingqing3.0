@@ -25,7 +25,8 @@ public class MainActivity extends Activity {
     ScrollView pageScroll;
     AgendaFeatures features;
     final android.os.Handler syncHandler=new android.os.Handler(android.os.Looper.getMainLooper());
-    final Runnable syncPoll=new Runnable(){public void run(){SyncManager.request(MainActivity.this);syncHandler.postDelayed(this,30000);}};
+    final Runnable syncPoll=new Runnable(){public void run(){SyncManager.request(MainActivity.this);AgendaView.tick(MainActivity.this);syncHandler.postDelayed(this,30000);}};
+    String agendaClockKey="";
     boolean syncRegistered;
     final android.content.BroadcastReceiver syncReceiver=new android.content.BroadcastReceiver(){public void onReceive(android.content.Context c,android.content.Intent i){if(data==null)return;JSONObject latest=SyncManager.data(MainActivity.this);if((!SyncMerge.same(latest,data)||i.getBooleanExtra("photos",false))&&getWindow().getDecorView().hasWindowFocus()){data=latest;if(!(MainActivity.this instanceof AiActivity))render();}}};
     int dp(float n){ return (int)(n*getResources().getDisplayMetrics().density+.5f); }
@@ -91,7 +92,7 @@ public class MainActivity extends Activity {
             TextView marker=text(date.equals(LocalDate.now())?"•":" ",12,active?Color.WHITE:BLUE,true);item.addView(marker);item.setOnClickListener(v->{selected=date;render();});strip.addView(item,new LinearLayout.LayoutParams(0,dp(100),1));
         }root.addView(strip);space(root,12);
     }
-    static class Entry {JSONObject source;boolean course,mood;String title,note,time;int minute;boolean allDay,done;}
+    static class Entry {JSONObject source;boolean course,mood,continuous,progress;String title,note,time,childId="";int minute;boolean allDay,done;}
     class TimelineRail extends LinearLayout {
         final android.graphics.Paint paint=new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
         TimelineRail(){super(MainActivity.this);setOrientation(VERTICAL);setWillNotDraw(false);}
@@ -100,39 +101,9 @@ public class MainActivity extends Activity {
         }
     }
     List<Entry> entries(){
-        List<Entry> list=new ArrayList<>();
-        if(data.optBoolean("configured"))for(int i=0;i<courses().length();i++){
-            JSONObject c=courses().optJSONObject(i);
-            if(CourseRules.occurs(semester(),selected,c,totalWeeks())){
-                Entry e=new Entry();e.source=c;e.course=true;e.title=c.optString("title");e.note=c.optString("room");e.time=start(c.optInt("from"))+"–"+end(c.optInt("to"));e.minute=ScheduleRules.minutes(start(c.optInt("from")));list.add(e);
-            }
-        }
-        for(int i=0;i<events().length();i++){
-            for(JSONObject s:TaskRules.visible(events().optJSONObject(i),selected,LocalDate.now())){
-            Entry e=new Entry();e.source=s;e.title=s.optString("title");e.note=s.optString("note");e.allDay=s.optBoolean("allDay")||s.optBoolean("carried");e.done=s.optBoolean("done");e.time=e.allDay?"全天":s.optString("start")+(s.optString("end").isEmpty()?"":"–"+s.optString("end"));e.minute=e.allDay?-1:ScheduleRules.minutes(s.optString("start"));list.add(e);}
-        }
-        JSONArray moods=data.optJSONArray("moods");for(int i=0;i<moods.length();i++){JSONObject m=moods.optJSONObject(i);if(!m.optString("date").equals(selected.toString()))continue;Entry e=new Entry();e.source=m;e.mood=true;e.title=m.optString("title").isEmpty()?"此刻的心情":m.optString("title");e.note=m.optString("body");e.time=m.optString("time");e.minute=ScheduleRules.minutes(e.time);list.add(e);}
-        list.removeIf(e->!features.visible(e));list.sort(Comparator.comparingInt(e->e.minute));return list;
+        List<Entry> list=AgendaItems.build(data,selected,LocalDateTime.now());list.removeIf(e->!features.visible(e));return list;
     }
-    void drawAgenda(){
-        features.controls();space(body,8);
-        LinearLayout heading=row();String prefix=selected.equals(LocalDate.now())?"今天 · ":"";heading.addView(text(prefix+selected.getMonthValue()+"月"+selected.getDayOfMonth()+"日 周"+DAYS[selected.getDayOfWeek().getValue()-1],20,INK,true),new LinearLayout.LayoutParams(0,-2,1));body.addView(heading);space(body,8);
-        List<Entry> list=entries();body.addView(text(list.size()+" 个安排 · 把今天过得从容一点",13,MUTED,false));space(body,14);
-        if(list.isEmpty()){space(body,65);TextView empty=text("今天，留一点空白\n\n点击 ＋ 添加安排",18,MUTED,false);empty.setGravity(Gravity.CENTER);body.addView(empty);if(!data.optBoolean("configured")){space(body,20);body.addView(action("设置学期，让课程自动出现",this::settings));}return;}
-        for(int group=0;group<4;group++){
-            List<Entry> items=new ArrayList<>();for(Entry e:list)if(DaySections.group(e.allDay,e.minute)==group)items.add(e);if(items.isEmpty())continue;
-            space(body,12);body.addView(text("◷  "+new String[]{"全天","上午","下午","晚上"}[group]+"  "+items.size(),15,MUTED,false));space(body,12);
-            for(Entry e:items){
-                if(e.mood){features.moodCard(e);continue;}
-                LinearLayout line=row();line.setGravity(Gravity.TOP);LinearLayout clock=new TimelineRail();clock.setPadding(0,dp(14),dp(7),0);TextView time=text(e.allDay?"":e.time.substring(0,5),15,INK,true);clock.addView(time);line.addView(clock,new LinearLayout.LayoutParams(dp(66),-1));
-                LinearLayout card=column();card.setPadding(dp(17),dp(18),dp(17),dp(18));card.setBackground(shape(e.done?0xffebedf3:Color.WHITE,24));
-                LinearLayout top=row();TextView name=text(e.title,19,e.done?MUTED:INK,true);if(e.done)name.setPaintFlags(name.getPaintFlags()|android.graphics.Paint.STRIKE_THRU_TEXT_FLAG);top.addView(name,new LinearLayout.LayoutParams(0,-2,1));TextView tag=text(e.course?"课程":e.done?"已完成":"待办",12,BLUE,false);tag.setPadding(dp(8),dp(4),dp(8),dp(4));tag.setBackground(shape(0xffedf4ff,9));top.addView(tag);card.addView(top);space(card,7);
-                card.addView(text((e.allDay?"全天":e.time)+(e.note.isEmpty()?"":" · "+e.note),13,MUTED,false));
-                features.paintTags(card,e.source,e.course);if(!e.course)features.taskCard(card,e.source);
-                card.setOnClickListener(v->{if(e.course)new AlertDialog.Builder(this).setTitle(e.title).setItems(new String[]{"编辑课程","记录感受"},(d,w)->{if(w==0)courseForm(e.source,e.source.optInt("day"),e.source.optInt("from"));else features.mood(null,e,true);}).show();else eventForm(e.source);});line.addView(card,new LinearLayout.LayoutParams(0,-2,1));body.addView(line);space(body,12);
-            }
-        }
-    }
+    void drawAgenda(){new AgendaView(this).draw();}
     void drawTable(){
         if(!data.optBoolean("configured")){body.addView(action("先设置开学日期与上课时间",this::settings));return;}
         LocalDate mon=ScheduleRules.monday(selected);body.addView(text(mon.format(DateTimeFormatter.ofPattern("MM.dd"))+" — "+mon.plusDays(6).format(DateTimeFormatter.ofPattern("MM.dd"))+"  · 点击空格添加课程",13,MUTED,false));space(body,12);

@@ -13,7 +13,7 @@ final class TaskRules {
     static void adjustDeadline(JSONObject event,JSONObject occurrence,LocalDate date){if(!event.optString("deadline").isEmpty())AgendaFeatures.put(occurrence,"deadline",date.plusDays(ChronoUnit.DAYS.between(LocalDate.parse(event.optString("date")),LocalDate.parse(event.optString("deadline")))).toString());}
     static JSONArray children(JSONObject event){JSONArray original=event.optJSONArray("children");try{return original==null?new JSONArray():new JSONArray(original.toString());}catch(JSONException e){throw new IllegalStateException(e);}}
     static int completed(JSONArray children){int n=0;for(int i=0;i<children.length();i++)if(children.optJSONObject(i).optBoolean("done"))n++;return n;}
-    static void resetChildren(JSONObject event){JSONArray children=children(event);for(int i=0;i<children.length();i++)AgendaFeatures.put(children.optJSONObject(i),"done",false);AgendaFeatures.put(event,"children",children);}
+    static void resetChildren(JSONObject event){JSONArray children=children(event);for(int i=0;i<children.length();i++){JSONObject child=children.optJSONObject(i);AgendaFeatures.put(child,"done",false);child.remove("completedDate");child.remove("focusDate");}event.remove("progressLog");event.remove("completedDate");AgendaFeatures.put(event,"children",children);}
     static List<JSONObject> visible(JSONObject event,LocalDate selected,LocalDate today){
         List<JSONObject> results=new ArrayList<>();LocalDate first=LocalDate.parse(event.optString("date"));
         if(first.isAfter(selected))return results;
