@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><title>心晴3.0</title><link rel="stylesheet" href="style.css"></head>
+<body>
+ <aside class="sidebar"><div class="brand"><span class="brand-icon">晴</span><div><b>心晴<span>3.0</span></b><small>让每一天，都有好心情</small></div></div><button id="new-event" class="primary new-button">＋ 新增安排</button><nav><button data-page="agenda">◷ <span>日程</span></button><button data-page="table">▥ <span>课表</span></button><button data-page="chat">✧ <span>AI 聊天</span></button></nav><div class="sidebar-caption">我的标签</div><div id="sidebar-tags"></div><button id="manage-tags" class="muted-button">＋ 管理标签</button><div class="sidebar-bottom"><div id="sync-status" role="status"></div><button id="settings-button">⚙ 设置与同步</button><small id="version"></small></div></aside>
+ <main class="workspace"><header class="topbar"><div><small id="eyebrow">把时间留给重要的事</small><h1 id="page-title">日程</h1></div><div class="top-actions"><input id="search" aria-label="搜索日程" placeholder="⌕ 搜索安排与心情"><button id="new-mood" class="soft">♡ 记录心情</button></div></header><div id="stage"></div></main>
+ <aside id="inspector" class="inspector"></aside><div id="toast" role="status" class="toast hidden"></div><dialog id="modal"><div id="modal-content"></div></dialog>
+ <script type="module" src="app.mjs"></script>
+</body></html>

@@ -1,0 +1,39 @@
+import {test,expect,_electron as electron} from '@playwright/test';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {pathToFileURL} from 'node:url';
+let app,page,root,errors;
+const screenshot=async name=>{fs.mkdirSync('test-results/screenshots',{recursive:true});await page.screenshot({path:`test-results/screenshots/${name}.png`});};
+async function launch(){app=await electron.launch({args:[path.resolve('.')],env:{...process.env,XINGQING_USER_DATA:root,XINGQING_TEST:'1'}});page=await app.firstWindow();errors=[];page.on('pageerror',e=>errors.push(e.message));await expect(page.locator('#version')).toContainText('1.0.0');page.on('dialog',d=>d.accept());}
+const bridge=(name,p={})=>page.evaluate(({name,p})=>window.xingqing.action(name,p),{name,p});
+test.beforeEach(async()=>{root=fs.mkdtempSync(path.join(os.tmpdir(),'xq-e2e-'));await launch();});
+test.afterEach(async()=>{if(page&&!page.isClosed())await screenshot('last-'+test.info().title.replace(/[^a-z0-9]/gi,'-').slice(0,70));await app?.close();expect(errors).toEqual([]);});
+
+test('course grid and agenda share exact times; timetable file round trips',async()=>{
+ const day=new Date().toLocaleDateString('sv-SE');
+ await bridge('settings.save',{value:{semester:day,totalWeeks:20,starts:['08:00','08:50','09:50','10:40','11:30','14:00','14:50','15:45','16:35','19:00','19:50','20:40'],ends:['08:45','09:35','10:35','11:25','12:15','14:45','15:35','16:30','17:20','19:45','20:35','21:25']}});
+ await page.locator('[data-page=table]').click();await page.getByRole('button',{name:'添加课程',exact:true}).click();await page.getByLabel('课程名称',{exact:true}).fill('现代导航技术');await page.getByLabel('教室',{exact:true}).fill('A302');
+ const checks=page.locator('#inspector .weekday-checks input');for(let i=0;i<7;i++)await checks.nth(i).setChecked(i===1||i===3);await page.getByLabel('开始节次',{exact:true}).fill('3');await page.getByLabel('结束节次',{exact:true}).fill('4');await page.locator('#inspector').getByRole('button',{name:'保存',exact:true}).click();await expect(page.locator('.class-box')).toHaveCount(2);await screenshot('timetable');
+ const output=path.join(root,'table.json');await app.evaluate(({dialog},file)=>{dialog.showSaveDialog=async()=>({canceled:false,filePath:file});dialog.showOpenDialog=async()=>({canceled:false,filePaths:[file]});dialog.showMessageBox=async()=>({response:1});},output);
+ await bridge('file.export');expect(JSON.parse(fs.readFileSync(output)).format).toBe('student-schedule-timetable');await bridge('file.import',{replace:true});expect((await bridge('state')).data.courses[0].days).toEqual([2,4]);
+ await page.locator('[data-page=agenda]').click();const date=new Date(day+'T12:00:00');date.setDate(date.getDate()+(4-(date.getDay()||7)));await page.getByLabel('选择日期',{exact:true}).fill(date.toLocaleDateString('sv-SE'));await expect(page.locator('.entry[data-title="现代导航技术"]')).toContainText('09:50–11:25');
+});
+test('ongoing child focus, long diary draft, native photo copy and restart persist',async()=>{
+ await page.locator('#new-event').click();await page.getByLabel('日程标题',{exact:true}).fill('本周论文');await page.getByLabel('持续任务（跨多天推进）',{exact:true}).check();await page.getByRole('button',{name:'＋ 添加子任务',exact:true}).click();await page.getByLabel('子任务名称',{exact:true}).fill('阅读文献');await page.getByRole('button',{name:'＋ 添加子任务',exact:true}).click();await page.getByLabel('子任务名称',{exact:true}).nth(1).fill('整理实验');await page.locator('#inspector').getByRole('button',{name:'保存',exact:true}).click();
+ await page.locator('.project-drawer summary').click();await page.getByRole('button',{name:'持续任务详情：本周论文'}).click();await page.getByRole('button',{name:'加入今天：阅读文献',exact:true}).click();await expect(page.getByLabel('完成今日子任务：阅读文献')).toBeVisible();await page.getByLabel('完成今日子任务：阅读文献').check();await expect(page.getByLabel('子任务：阅读文献',{exact:true})).toBeChecked();await screenshot('today-and-project');
+ await page.locator('#new-mood').click();const long='今天慢慢完成了阅读，也有很多想记录的细节。\n'.repeat(100);await page.getByLabel('写下此刻的想法',{exact:true}).fill(long);await expect.poll(async()=>Object.keys((await bridge('state')).drafts).length).toBeGreaterThan(0);
+ const source=path.join(root,'original.png');fs.copyFileSync(path.resolve('ui/icon.png'),source);await app.evaluate(({dialog},file)=>{dialog.showOpenDialog=async()=>({canceled:false,filePaths:[file]});},source);
+ // Import the existing original app icon via native file selection.
+ if(!fs.statSync(source).size)throw Error('photo fixture missing');
+ await page.getByRole('button',{name:'＋ 从电脑添加照片',exact:true}).click();await expect(page.locator('.photo-grid img')).toHaveCount(1);await screenshot('long-diary');await page.locator('#inspector').getByRole('button',{name:'保存',exact:true}).click();fs.unlinkSync(source);
+ await app.close();await launch();const state=await bridge('state');expect(state.data.moods[0].body).toBe(long);expect(state.data.events[0].children[0].done).toBe(true);expect(await bridge('photos.get',{name:state.data.moods[0].photos[0]})).toMatch(/^data:image/);await screenshot('agenda');
+});
+test('real Windows vault, automatic sync and separate AI conversations with confirmed cards',async()=>{
+ await app.evaluate(async(_electron,helpers)=>{const {FakeCloud}=await import(helpers);const cloud=new FakeCloud();globalThis.xqTest.sync.clientFactory=()=>cloud.client();globalThis.xqTest.chat.transport=async()=>new Response(JSON.stringify({choices:[{finish_reason:'tool_calls',message:{content:'可以，我们一起把今天安排好。',tool_calls:[{function:{name:'propose_records',arguments:JSON.stringify({actions:[{kind:'event',title:'AI安排的阅读',date:new Date().toLocaleDateString('sv-SE'),allDay:true}]})}}]}}]}));},pathToFileURL(path.resolve('test/helpers.mjs')).href);
+ await page.locator('#settings-button').click();await page.getByLabel('CloudBase 环境 ID',{exact:true}).fill('test-env-123');await page.getByLabel('同步用户名',{exact:true}).fill('phone-owner');await page.getByLabel('同步密码',{exact:true}).fill('password');await page.getByRole('button',{name:'登录并合并同步',exact:true}).click();await expect(page.getByRole('button',{name:'立即同步',exact:true})).toBeVisible();await page.getByLabel('DeepSeek API Key',{exact:true}).fill('test-private-deepseek');await page.getByRole('button',{name:'保存 Key',exact:true}).click();await expect.poll(async()=> (await bridge('state')).hasAIKey).toBe(true);
+ const ciphertext=fs.readFileSync(path.join(root,'credentials.enc'));expect(ciphertext.includes(Buffer.from('test-private-deepseek'))).toBe(false);expect(ciphertext.includes(Buffer.from('private-refresh'))).toBe(false);
+ await page.locator('[data-page=chat]').click();await page.getByLabel('给 AI 发消息',{exact:true}).fill('帮我安排阅读');await page.getByRole('button',{name:'发送',exact:true}).click();await expect(page.getByRole('button',{name:'编辑并保存',exact:true})).toBeVisible();expect((await bridge('state')).data.events).toHaveLength(0);await screenshot('ai-chat');await page.getByRole('button',{name:'编辑并保存',exact:true}).click();await page.locator('#inspector').getByRole('button',{name:'保存',exact:true}).click();expect((await bridge('state')).data.events).toHaveLength(1);
+ await page.getByRole('button',{name:'＋ 新对话',exact:true}).click();await expect(page.locator('.message')).toHaveCount(0);expect((await bridge('state')).chats).toHaveLength(2);expect(await page.evaluate(()=>typeof window.require)).toBe('undefined');await expect(page.evaluate(()=>window.xingqing.action('exec',{cmd:'bad'}))).rejects.toThrow('不支持的操作');
+ await app.close();await launch();expect((await bridge('state')).sync.enabled).toBe(true);expect((await bridge('state')).hasAIKey).toBe(true);await screenshot('synced-restart');
+});

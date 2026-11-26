@@ -6,3 +6,9 @@ local.properties
 .idea/
 .signing/
 .signing-backup/
+desktop/node_modules/
+desktop/dist/
+desktop/test-results/
+desktop/playwright-report/
+desktop/ui/icon.png
+desktop/ui/icon.ico

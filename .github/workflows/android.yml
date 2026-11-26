@@ -1,7 +1,9 @@
 name: Android APK
 on:
   push:
+    paths: ['app/**', 'scripts/**', 'cloudbase/**', '*.gradle', 'gradle.properties', '.github/workflows/android.yml']
   pull_request:
+    paths: ['app/**', 'scripts/**', 'cloudbase/**', '*.gradle', 'gradle.properties', '.github/workflows/android.yml']
   workflow_dispatch:
 permissions:
   contents: read
