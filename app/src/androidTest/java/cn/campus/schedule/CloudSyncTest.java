@@ -22,6 +22,7 @@ public class CloudSyncTest {
         @Override public SharedPreferences getSharedPreferences(String name,int mode){return super.getSharedPreferences(prefix+name,mode);}
         @Override public Context getApplicationContext(){return this;}
         @Override public File getFilesDir(){File dir=new File(super.getFilesDir(),prefix);dir.mkdirs();return dir;}
+        @Override public File getDatabasePath(String name){return super.getDatabasePath(prefix+name);}
         @Override public SQLiteDatabase openOrCreateDatabase(String n,int mode,SQLiteDatabase.CursorFactory f){return super.openOrCreateDatabase(prefix+n,mode,f);}
         @Override public SQLiteDatabase openOrCreateDatabase(String n,int mode,SQLiteDatabase.CursorFactory f,android.database.DatabaseErrorHandler e){return super.openOrCreateDatabase(prefix+n,mode,f,e);}
         @Override public boolean deleteDatabase(String name){return super.deleteDatabase(prefix+name);}
