@@ -24,6 +24,10 @@ public class MainActivity extends Activity {
     LinearLayout root,body;
     ScrollView pageScroll;
     AgendaFeatures features;
+    final android.os.Handler syncHandler=new android.os.Handler(android.os.Looper.getMainLooper());
+    final Runnable syncPoll=new Runnable(){public void run(){SyncManager.request(MainActivity.this);syncHandler.postDelayed(this,30000);}};
+    boolean syncRegistered;
+    final android.content.BroadcastReceiver syncReceiver=new android.content.BroadcastReceiver(){public void onReceive(android.content.Context c,android.content.Intent i){if(data==null)return;JSONObject latest=SyncManager.data(MainActivity.this);if(!SyncMerge.same(latest,data)&&getWindow().getDecorView().hasWindowFocus()){data=latest;if(!(MainActivity.this instanceof AiActivity))render();}}};
     int dp(float n){ return (int)(n*getResources().getDisplayMetrics().density+.5f); }
     JSONObject obj(Object... pairs) {
         JSONObject o=new JSONObject();
@@ -38,6 +42,7 @@ public class MainActivity extends Activity {
     String end(int n){return data.optJSONArray("ends").optString(n-1);}
     @Override public void onCreate(Bundle state){
         super.onCreate(state);
+        SyncManager.restore(this);
         String saved=getPreferences(MODE_PRIVATE).getString("data",null);
         try { data=saved==null?obj("semester",ScheduleRules.monday(LocalDate.now()).toString(),"configured",false,"totalWeeks",20,"starts",new JSONArray(Arrays.asList(DEFAULT_START)),"ends",new JSONArray(Arrays.asList(DEFAULT_END)),"courses",new JSONArray(),"events",new JSONArray()):new JSONObject(saved); }
         catch(JSONException e){ new AlertDialog.Builder(this).setTitle("数据读取失败").setMessage("原始数据已保留，请重新启动或联系开发者。").setPositiveButton("关闭",(d,w)->finish()).setCancelable(false).show(); return; }
@@ -47,10 +52,11 @@ public class MainActivity extends Activity {
     @Override protected void onSaveInstanceState(Bundle out){super.onSaveInstanceState(out);out.putString("selected",selected.toString());out.putBoolean("timetable",timetable);}
     @Override protected void onActivityResult(int request,int result,android.content.Intent intent){super.onActivityResult(request,result,intent);new TimetableTransfer(this).result(request,result,intent);}
     @Override protected void onNewIntent(android.content.Intent intent){super.onNewIntent(intent);setIntent(intent);if(intent.hasExtra("date"))selected=LocalDate.parse(intent.getStringExtra("date"));if(intent.hasExtra("page"))timetable="table".equals(intent.getStringExtra("page"));render();}
-    @Override protected void onResume(){super.onResume();if(features!=null){try{data=new JSONObject(getPreferences(0).getString("data",data.toString()));}catch(JSONException ignored){}ReminderScheduler.schedule(this);render();}}
+    @Override protected void onResume(){super.onResume();if(!syncRegistered){androidx.core.content.ContextCompat.registerReceiver(this,syncReceiver,new android.content.IntentFilter(SyncManager.CHANGED),androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED);syncRegistered=true;}syncHandler.removeCallbacks(syncPoll);syncPoll.run();if(features!=null){try{data=new JSONObject(getPreferences(0).getString("data",data.toString()));}catch(JSONException ignored){}ReminderScheduler.schedule(this);render();}}
+    @Override protected void onPause(){syncHandler.removeCallbacks(syncPoll);if(syncRegistered){unregisterReceiver(syncReceiver);syncRegistered=false;}super.onPause();}
     boolean persist(JSONObject next){
-        if(!getPreferences(MODE_PRIVATE).edit().putString("data",next.toString()).commit()){toast("保存失败，请重试");return false;}
-        data=next;ReminderScheduler.schedule(this);return true;
+        if(!SyncManager.persist(this,data,next)){toast("保存失败，请重试");return false;}
+        data=SyncManager.data(this);ReminderScheduler.schedule(this);return true;
     }
     JSONObject copy(){try{return new JSONObject(data.toString());}catch(JSONException e){throw new IllegalStateException(e);}}
     GradientDrawable shape(int color,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));return d;}
@@ -172,7 +178,7 @@ public class MainActivity extends Activity {
     void timePicker(TextView button,String[] values,int index){String value=values[index].isEmpty()?"15:00":values[index];new TimePickerDialog(this,(p,h,m)->{values[index]=String.format(Locale.ROOT,"%02d:%02d",h,m);button.setText(values[index]);},Integer.parseInt(value.substring(0,2)),Integer.parseInt(value.substring(3)),true).show();}
     void eventForm(JSONObject e){ features.eventForm(e); }
     void settings(){
-        LinearLayout f=form();f.addView(action("提醒设置",()->ReminderSettings.show(this)));f.addView(action("课表导入／导出",()->new TimetableTransfer(this).menu()));f.addView(text("开学日期所在的周记为第 1 周，周一开始。",13,MUTED,false));LocalDate[] date={semester()};TextView dateButton=text(date[0].toString()+"  ›",18,BLUE,true);f.addView(dateButton,new LinearLayout.LayoutParams(-1,dp(56)));dateButton.setGravity(Gravity.CENTER_VERTICAL);dateButton.setOnClickListener(v->pickDate(date[0],d->{date[0]=d;dateButton.setText(d.toString()+"  ›");}));EditText count=field(f,"学期周数（1–52）",""+totalWeeks());count.setInputType(2);f.addView(text("每节课时间 · 点击修改",16,INK,true));space(f,10);
+        LinearLayout f=form();f.addView(action("云端同步",()->SyncSettings.show(this)));f.addView(action("提醒设置",()->ReminderSettings.show(this)));f.addView(action("课表导入／导出",()->new TimetableTransfer(this).menu()));f.addView(text("开学日期所在的周记为第 1 周，周一开始。",13,MUTED,false));LocalDate[] date={semester()};TextView dateButton=text(date[0].toString()+"  ›",18,BLUE,true);f.addView(dateButton,new LinearLayout.LayoutParams(-1,dp(56)));dateButton.setGravity(Gravity.CENTER_VERTICAL);dateButton.setOnClickListener(v->pickDate(date[0],d->{date[0]=d;dateButton.setText(d.toString()+"  ›");}));EditText count=field(f,"学期周数（1–52）",""+totalWeeks());count.setInputType(2);f.addView(text("每节课时间 · 点击修改",16,INK,true));space(f,10);
         String[] times=new String[24];for(int i=0;i<12;i++){times[i*2]=start(i+1);times[i*2+1]=end(i+1);LinearLayout r=row();r.addView(text("第 "+(i+1)+" 节",14,INK,true),new LinearLayout.LayoutParams(dp(60),dp(48)));for(int j=0;j<2;j++){final int index=i*2+j;TextView button=action(times[index],()->{});button.setTextSize(16);button.setOnClickListener(v->timePicker(button,times,index));r.addView(button,new LinearLayout.LayoutParams(0,dp(48),1));}f.addView(r);}
         AlertDialog dialog=dialog("学期与节次设置",f,()->{
             int weeks;try{weeks=Integer.parseInt(count.getText().toString());}catch(NumberFormatException e){throw new IllegalArgumentException("请输入有效周数");}if(weeks<1||weeks>52)throw new IllegalArgumentException("学期周数须为 1–52");

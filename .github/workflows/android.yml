@@ -6,6 +6,25 @@ on:
 permissions:
   contents: read
 jobs:
+  sync-database:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sync transactions, idempotency and account isolation
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 -f cloudbase/test-bootstrap.sql
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 -f cloudbase/sync.sql
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 -f cloudbase/test-sync.sql
   build:
     runs-on: ubuntu-24.04
     strategy:

@@ -1,1 +1,1 @@
-<full-backup-content><exclude domain="sharedpref" path="ai_credentials.xml" /></full-backup-content>
+<full-backup-content><exclude domain="sharedpref" path="ai_credentials.xml" /><exclude domain="sharedpref" path="sync_credentials.xml" /><exclude domain="sharedpref" path="cloud_sync.xml" /><exclude domain="database" path="cloud-sync.db" /></full-backup-content>
