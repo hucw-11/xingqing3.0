@@ -27,7 +27,7 @@ public class MainActivity extends Activity {
     final android.os.Handler syncHandler=new android.os.Handler(android.os.Looper.getMainLooper());
     final Runnable syncPoll=new Runnable(){public void run(){SyncManager.request(MainActivity.this);syncHandler.postDelayed(this,30000);}};
     boolean syncRegistered;
-    final android.content.BroadcastReceiver syncReceiver=new android.content.BroadcastReceiver(){public void onReceive(android.content.Context c,android.content.Intent i){if(data==null)return;JSONObject latest=SyncManager.data(MainActivity.this);if(!SyncMerge.same(latest,data)&&getWindow().getDecorView().hasWindowFocus()){data=latest;if(!(MainActivity.this instanceof AiActivity))render();}}};
+    final android.content.BroadcastReceiver syncReceiver=new android.content.BroadcastReceiver(){public void onReceive(android.content.Context c,android.content.Intent i){if(data==null)return;JSONObject latest=SyncManager.data(MainActivity.this);if((!SyncMerge.same(latest,data)||i.getBooleanExtra("photos",false))&&getWindow().getDecorView().hasWindowFocus()){data=latest;if(!(MainActivity.this instanceof AiActivity))render();}}};
     int dp(float n){ return (int)(n*getResources().getDisplayMetrics().density+.5f); }
     JSONObject obj(Object... pairs) {
         JSONObject o=new JSONObject();

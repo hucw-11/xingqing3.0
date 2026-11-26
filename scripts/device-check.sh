@@ -14,6 +14,7 @@ collect() {
   adb pull /data/local/tmp/evening-floating-button.png screenshots/ || true
   adb pull /data/local/tmp/chat-retry.png screenshots/ || true
   adb pull /data/local/tmp/chat-sessions-menu.png screenshots/ || true
+  adb pull /data/local/tmp/cloud-sync-settings.png screenshots/ || true
   adb logcat -d -s AndroidRuntime:E > screenshots/crashes.txt || true
 }
 trap collect EXIT
