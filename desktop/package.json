@@ -24,7 +24,7 @@
     "directories": {"output": "dist"},
     "files": ["main/**", "core/**", "ui/**", "package.json"],
     "asar": true,
-    "win": {"target": ["nsis", "portable"], "icon": "ui/icon.ico", "signAndEditExecutable": false},
+    "win": {"target": ["nsis", "portable"], "icon": "ui/icon.ico"},
     "nsis": {"artifactName": "Xingqing-Desktop-${version}-Setup-${arch}.${ext}", "oneClick": false, "perMachine": false, "allowToChangeInstallationDirectory": true, "createDesktopShortcut": true, "deleteAppDataOnUninstall": false, "shortcutName": "心晴3.0"},
     "portable": {"artifactName": "Xingqing-Desktop-${version}-Portable-${arch}.${ext}"}
   }
