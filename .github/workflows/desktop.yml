@@ -16,6 +16,7 @@ jobs:
         working-directory: desktop
     env:
       ELECTRON_DISABLE_SECURITY_WARNINGS: 'true'
+      DEBUG: 'pw:browser'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
