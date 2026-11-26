@@ -5,7 +5,7 @@ const button=(text,run,cls='',attrs={})=>h('button',{type:'button',class:cls,onc
 let state,selected=M.today(),page='agenda',filter='all',tagFilter='',query='',inspectorMode=null,request=0,toastTimer,chatId='',draftTimer;
 const folds=new Map(),photoCache=new Map(),chatDrafts=new Map();
 function toast(text){$('#toast').textContent=text;$('#toast').classList.remove('hidden');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').classList.add('hidden'),4500);}
-async function action(name,p={},message=''){try{const result=await api.action(name,p);await refresh();if(message)toast(message);return result;}catch(e){toast(e.message);throw e;}}
+async function action(name,p={},message=''){try{const result=await api.action(name,p);await refresh();if(message&&result!==false)toast(message);return result;}catch(e){toast(e.message);throw e;}}
 function fire(name,p={},message=''){void action(name,p,message).catch(()=>{});}
 async function refresh(){const id=++request;try{const next=await api.action('state');if(id!==request)return;state=next;render();}catch(e){toast(e.message);}}
 function modal(title,content,actions=[]){const root=$('#modal-content');root.replaceChildren(h('h2',{},title),content,h('div',{class:'modal-actions'},...actions,button('关闭',()=>$('#modal').close())));$('#modal').showModal();}
