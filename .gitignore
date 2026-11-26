@@ -12,3 +12,4 @@ desktop/test-results/
 desktop/playwright-report/
 desktop/ui/icon.png
 desktop/ui/icon.ico
+desktop/packaged-test-results/
