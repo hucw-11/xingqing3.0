@@ -42,3 +42,6 @@ test('long diary, optional title, five levels and validation',()=>{
  assert.throws(()=>M.dayNo('2026-02-30'));assert.throws(()=>M.validateSettings({...base(),ends:['07:00',...M.ends.slice(1)]},base()));
 });
 test('deleting tags removes references inside occurrence overrides',()=>{const data=base();data.events=[task({tags:['desktop-study'],overrides:{[day]:{tags:['desktop-study']}}})];const next=M.unlinkLabel(data,'desktop-study');assert.deepEqual(next.events[0].overrides[day].tags,[]);assert.equal(next.labels.length,3);});
+test('reminders summarize unfinished mother tasks once, marking close and overdue deadlines',()=>{
+ const data=base();data.events=[task({deadline:'2026-11-26'}),task({id:'done',done:true,completedDate:day}),task({id:'later',date:'2026-11-27',continuous:false,allDay:false,start:'14:00',deadline:'2026-11-28'})];const rows=M.summary(data,day);assert.deepEqual(rows.map(e=>e.id),['parent','later']);assert.match(M.deadlineText(rows[0],day),/紧急/);assert.match(M.deadlineText({...rows[0],deadline:'2026-11-24'},day),/已逾期/);
+});
