@@ -1,3 +1,4 @@
+import {arrange} from './planning.mjs';
 export const clone = value => value === undefined ? undefined : structuredClone(value);
 export const uid = () => globalThis.crypto.randomUUID();
 export const today = (now = new Date()) => `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
@@ -34,7 +35,7 @@ export function agenda(data,day,now=new Date()){
  for(const c of data.courses||[])if(courseOccurs(data,c,day)){const start=data.starts[c.from-1],end=data.ends[c.to-1];out.push({type:'course',source:c,title:c.title,note:c.room,time:`${start}–${end}`,minute:minutes(start),done:day<current||day===current&&end<=time});}
  for(const e of data.events||[])for(const task of forDay(e,day,current)){const allDay=!!(task.allDay||task.carried),entry={type:task.progressSummary?'progress':'event',source:task,title:task.title,note:task.progressSummary||task.note||'',allDay,time:allDay?'全天':task.start+(task.end?`–${task.end}`:''),minute:allDay?-1:minutes(task.start),done:!!task.done,continuous:!!(task.continuous&&!task.done)};out.push(entry);if(task.continuous&&!task.done&&day===current)for(const child of task.children||[])if(focused(child,day))out.push({...entry,type:'child',continuous:false,childId:child.id,title:child.title,note:`来自 · ${task.title}`,done:!!child.done,allDay:true,time:'全天',minute:-1});}
  for(const m of data.moods||[])if(m.date===day)out.push({type:'mood',source:m,title:m.title||'此刻的心情',note:m.body||'',time:m.time,minute:minutes(m.time),done:false});
- return out.sort((a,b)=>Number(a.done)-Number(b.done)||a.minute-b.minute||(a.title<b.title?-1:a.title>b.title?1:0));
+ return arrange(data,out,day);
 }
 export function recordProgress(before,after,now=new Date()){
  const log={...clone(before?.progressLog||{}),...clone(after.progressLog||{})},day=today(now),time=clockTime(now)+`:${String(now.getSeconds()).padStart(2,'0')}`,previous=new Map((before?.children||[]).map(c=>[c.id,c]));

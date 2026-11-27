@@ -67,7 +67,8 @@ public class MainActivity extends Activity {
     TextView action(String s,Runnable run){TextView t=text(s,21,BLUE,false);t.setGravity(Gravity.CENTER);t.setMinWidth(dp(44));t.setMinHeight(dp(44));t.setOnClickListener(v->run.run());return t;}
     void space(LinearLayout l,int h){l.addView(new android.view.View(this),new LinearLayout.LayoutParams(1,dp(h)));}
     void toast(String s){Toast.makeText(this,s,Toast.LENGTH_LONG).show();}
-    void render(){
+    LocalDate renderedDate;boolean renderedTable;
+    void render(){int restoreY=pageScroll!=null&&selected.equals(renderedDate)&&timetable==renderedTable?pageScroll.getScrollY():0;renderedDate=selected;renderedTable=timetable;
         root=column();root.setBackgroundColor(BG);root.setPadding(dp(20),dp(12),dp(20),dp(12));setContentView(root);
         LinearLayout header=row();TextView title=text(timetable?"课表":"日程",30,INK,true);header.addView(title,new LinearLayout.LayoutParams(0,dp(58),1));title.setGravity(Gravity.CENTER_VERTICAL);
         header.addView(action("今天",()->{selected=LocalDate.now();render();}));
@@ -81,7 +82,7 @@ public class MainActivity extends Activity {
         ScrollView scroll=new ScrollView(this);pageScroll=scroll;scroll.setFillViewport(true);scroll.setClipToPadding(false);body=column();body.setPadding(0,dp(12),0,dp(20));scroll.addView(body);FrameLayout contentFrame=new FrameLayout(this);contentFrame.addView(scroll,new FrameLayout.LayoutParams(-1,-1));root.addView(contentFrame,new LinearLayout.LayoutParams(-1,0,1));if(!timetable){body.setPadding(0,dp(12),0,dp(96));TextView fab=action("＋",features::plus);fab.setContentDescription("创建日程或心情");fab.setTextSize(30);fab.setTextColor(Color.WHITE);fab.setBackground(shape(BLUE,30));fab.setElevation(dp(6));FrameLayout.LayoutParams fp=new FrameLayout.LayoutParams(dp(56),dp(56),Gravity.BOTTOM|Gravity.END);fp.setMargins(dp(12),dp(12),dp(12),dp(12));contentFrame.addView(fab,fp);}
         if(timetable)drawTable();else drawAgenda();
         LinearLayout nav=row();nav.setPadding(dp(5),dp(5),dp(5),dp(5));nav.setBackground(shape(Color.WHITE,40));nav.setElevation(dp(4));
-        for(int i=0;i<3;i++){if(i==2){TextView ai=action("✧  AI",()->startActivity(new android.content.Intent(this,AiActivity.class).putExtra("date",selected.toString())));ai.setTextSize(17);nav.addView(ai,new LinearLayout.LayoutParams(0,dp(52),1));continue;}final boolean page=i==0;TextView tab=text((i==0?"▥  课表":"▣  日程"),17,timetable==page?BLUE:MUTED,true);tab.setGravity(Gravity.CENTER);if(timetable==page)tab.setBackground(shape(0xffe2edfc,32));tab.setOnClickListener(v->{timetable=page;render();});nav.addView(tab,new LinearLayout.LayoutParams(0,dp(52),1));}root.addView(nav);
+        for(int i=0;i<3;i++){if(i==2){TextView ai=action("✧  AI",()->startActivity(new android.content.Intent(this,AiActivity.class).putExtra("date",selected.toString())));ai.setTextSize(17);nav.addView(ai,new LinearLayout.LayoutParams(0,dp(52),1));continue;}final boolean page=i==0;TextView tab=text((i==0?"▥  课表":"▣  日程"),17,timetable==page?BLUE:MUTED,true);tab.setGravity(Gravity.CENTER);if(timetable==page)tab.setBackground(shape(0xffe2edfc,32));tab.setOnClickListener(v->{timetable=page;render();});nav.addView(tab,new LinearLayout.LayoutParams(0,dp(52),1));}root.addView(nav);pageScroll.setFocusableInTouchMode(true);pageScroll.requestFocus();pageScroll.post(()->pageScroll.scrollTo(0,restoreY));
     }
     void weekStrip(){
         LinearLayout strip=row();LocalDate monday=ScheduleRules.monday(selected);

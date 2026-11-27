@@ -7,3 +7,4 @@ body{grid-template-rows:minmax(0,1fr)}
 #sidebar-tags{overflow-y:auto;min-height:0}
 #modal.writing-mode{max-width:960px;width:82vw}
 .writing-pad{height:58vh;min-height:280px;font-size:15px;line-height:2;resize:none;padding:20px;white-space:pre-wrap}
+.drag-handle{cursor:grab;color:#8ea2bc;padding:0 8px 0 0;font-size:20px}.drop-target .entry{outline:2px solid #80b5ff}#stage{overflow-anchor:none}.entry-head{align-items:center}

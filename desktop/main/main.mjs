@@ -1,3 +1,4 @@
+import * as Planning from '../core/planning.mjs';
 import {app,BrowserWindow,ipcMain,dialog,safeStorage,nativeImage,Menu,Tray,Notification} from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -21,7 +22,7 @@ function originalOccurrence(id,day){const series=store.state.data.events.find(e=
 function preserveEdit(baseline,local,current){if(!baseline)return local;const result=merge(baseline,local,current);if(result.conflict){store.backup('edit-conflict');throw Error('其他设备也修改了这条记录。本机草稿已保留，请关闭编辑后重新打开，或先导出草稿内容。');}return result.value;}
 async function confirm(title,detail){return (await dialog.showMessageBox(win,{type:'question',title,message:title,detail,buttons:['取消','确定'],defaultId:0,cancelId:0})).response===1;}
 async function perform(name,p={}){
- if(name==='state')return view();
+ if(name==='agenda.plan'){dataChange(Planning.set(store.state.data,p.ref,p.date,p.plan));return true;}if(name==='agenda.reorder'){dataChange(Planning.reorder(store.state.data,p.date,p.refs));return true;}if(name==='state')return view();
  if(name==='event.save'){const current=p.id?originalOccurrence(p.id,p.day):null;const value=preserveEdit(p.baseline,p.value,current);dataChange(M.saveEvent(store.state.data,value,{id:p.id,day:p.day,scope:p.scope}));return true;}
  if(name==='event.remove'){dataChange(M.saveEvent(store.state.data,null,{id:p.id,day:p.day,scope:p.scope,remove:true}));return true;}
  if(name==='event.toggle'){dataChange(M.toggleTask(store.state.data,p.id,p.day,!!p.done));return true;}
