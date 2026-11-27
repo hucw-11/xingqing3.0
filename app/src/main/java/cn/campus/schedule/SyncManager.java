@@ -45,16 +45,16 @@ final class SyncManager {
     static void pause(Context c){synchronized(LOCK){prefs(c).edit().putBoolean("enabled",false).commit();if(pending!=null)pending.cancel(false);SyncCredentials.clear(c);c.getSystemService(JobScheduler.class).cancel(320);c.getSystemService(JobScheduler.class).cancel(321);}status(c,"已退出同步，本机内容继续保留");}
     static String token(Context c,CloudBaseClient client)throws Exception{JSONObject tokens=SyncCredentials.read(c);if(tokens.optString("access_token").isEmpty())throw new IOException("请先登录同步账号");if(tokens.optLong("expires_at")<System.currentTimeMillis()+60000){JSONObject renewed=client.refresh(tokens.getString("refresh_token"));if(!renewed.has("sub"))AgendaFeatures.put(renewed,"sub",tokens.optString("sub"));if(!renewed.has("refresh_token"))AgendaFeatures.put(renewed,"refresh_token",tokens.optString("refresh_token"));AgendaFeatures.put(renewed,"expires_at",System.currentTimeMillis()+renewed.optLong("expires_in",7200)*1000);synchronized(LOCK){if(!enabled(c))throw new IOException("同步已暂停");SyncCredentials.save(c,renewed);}tokens=renewed;}return tokens.getString("access_token");}
     static void run(Context context){Context c=context.getApplicationContext();synchronized(LOCK){if(running||!enabled(c))return;running=true;}status(c,"正在同步…");try{CloudBaseClient client=new CloudBaseClient(prefs(c).getString("env",""),device(c));synchronize(c,client,token(c,client),prefs(c).getString("uid",""));}catch(Exception e){status(c,e instanceof CloudBaseClient.Failure?e.getMessage():"同步未完成，本机修改已保留，将在联网后重试");}finally{synchronized(LOCK){running=false;}}}
-    static void synchronize(Context c,CloudBaseClient client,String token,String uid)throws Exception{
+    static void synchronize(Context c,CloudBaseClient client,String token,String uid)throws Exception{photoWarnings.clear();
         try(SyncLedger ledger=new SyncLedger(c)){
-            pull(c,ledger,client,token);
+            pull(c,ledger,client,token);repairPhotos(c,ledger,client,token,uid);
             downloadPhotos(c,ledger,client,token,uid);
             synchronized(LOCK){if(!enabled(c))return;if(ledger.meta("firstPull").equals("true")){if(ledger.rows().isEmpty())ledger.capture(data(c));ledger.meta("firstPull","false");}else ledger.capture(data(c));}
             for(int pass=0;pass<3;pass++){
                 List<SyncLedger.Row> changes;synchronized(LOCK){changes=ledger.rows();}
                 boolean sent=false;for(SyncLedger.Row row:changes){if(!enabled(c))return;if(!row.dirty||row.conflict!=null)continue;try{uploadPhotos(c,client,token,uid,row.value);}catch(Exception photo){photoWarnings.add("上传："+row.key);continue;}if(!enabled(c))return;JSONObject response=client.push(token,row),server=response.getJSONObject("record");synchronized(LOCK){if(!enabled(c))return;ledger.meta("projectPending","true");SyncLedger.Row live=ledger.find(row.key);if(response.optBoolean("accepted")&&live!=null){live.base=row.value;live.revision=server.getLong("revision");live.dirty=!SyncMerge.same(live.value,row.value);if(live.dirty)live.mutation=UUID.randomUUID().toString();ledger.put(live);}else ledger.accept(server);publish(c,ledger);}sent=true;}if(!sent)break;
             }
-            pull(c,ledger,client,token);downloadPhotos(c,ledger,client,token,uid);
+            pull(c,ledger,client,token);repairPhotos(c,ledger,client,token,uid);downloadPhotos(c,ledger,client,token,uid);
             int conflicts=0,dirty=0;synchronized(LOCK){for(SyncLedger.Row r:ledger.rows()){if(r.conflict!=null)conflicts++;if(r.dirty)dirty++;}prefs(c).edit().putLong("lastSuccess",System.currentTimeMillis()).apply();}
             status(c,conflicts>0?"有 "+conflicts+" 条修改冲突，请选择保留版本":dirty>0?"仍有 "+dirty+" 条修改等待同步":"同步完成 · "+LocalTime.now().withNano(0));if(!photoWarnings.isEmpty())status(c,"记录同步已处理 · "+photoWarnings.size()+" 项照片待恢复，联网后自动重试");
         }ReminderScheduler.schedule(c);

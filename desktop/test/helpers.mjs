@@ -7,7 +7,7 @@ export class MemoryStore {
  backup(name){this.backups.push([name,clone(this.state)]);}
 }
 export class MemoryVault {data={};async get(k){return clone(this.data[k]);}async set(k,v){this.data[k]=clone(v);}}
-export class MemoryPhotos {files=new Map();markers=new Set();exists(n){return this.files.has(n);}write(n,b){this.files.set(n,new Uint8Array(b));}read(n){return this.files.get(n);}uploaded(k){return this.markers.has(k);}mark(k){this.markers.add(k);}}
+export class MemoryPhotos {constructor(store){this.store=store;}files=new Map();markers=new Set();exists(n){return this.files.has(n);}write(n,b){this.files.set(n,new Uint8Array(b));}read(n){return this.files.get(n);}uploaded(k){return this.store?!!this.store.state.uploaded?.[k]:this.markers.has(k);}mark(k){if(this.store)this.store.change(s=>{s.uploaded??={};s.uploaded[k]=true;});else this.markers.add(k);}}
 export class FakeCloud {
  rows=new Map();images=new Map();revision=0;lostAck=false;requests=[];
  client(){const request=async(url,opts)=>{this.requests.push([url,opts]);const path=new URL(url).pathname,body=opts.body instanceof Uint8Array?opts.body:opts.body?JSON.parse(opts.body):null;let result;
