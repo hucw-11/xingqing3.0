@@ -1,10 +1,10 @@
-# 心晴3.0 Windows 桌面版
+# 心晴3.0 Windows 桌面版 1.1
 
 Windows 10/11 x64 安装程序与便携程序均由 GitHub Actions 生成。本机无需安装 Node、Java、Android SDK 或其他开发环境。
 
 ## 使用
 
-1. 运行 `Xingqing-Desktop-1.0.0-Setup-x64.exe` 安装，或使用 `Portable-x64.exe`。
+1. 运行 `Xingqing-Desktop-1.1.0-Setup-x64.exe` 安装，或使用 `Portable-x64.exe`。原1.0版可以覆盖升级。
 2. 「设置与同步」中填写手机已经使用的 CloudBase 环境 ID、同步用户名和密码，登录并合并同步。原环境的数据库和存储规则无需修改。
 3. 登录凭证由 Windows 加密保存在本机。以后启动程序时自动恢复登录，修改后及运行期间自动同步；凭证过期且不能刷新时才需重新登录。离线可以继续编辑。
 4. DeepSeek Key 需在电脑上单独填写。AI 对话、上下文设置、草稿和 Key 留在本机，不通过账号同步到手机。AI 建议需打开卡片、检查并保存后才成为记录。
